@@ -15,7 +15,7 @@ auto& deref(T* x)
 
 const auto& library()
 {
-    static auto result = Tensile::EmbeddedLibrary<Tensile::TensileContraction>::NewLibrary("miopen_tensile_kernels");
+    static auto result = Tensile::EmbeddedLibrary<Tensile::ContractionProblem>::NewLibrary("miopen_tensile_kernels");
     return *result;
 }
 
@@ -40,13 +40,13 @@ miopen_tensile_status miopen_tensile_gemm(hipStream_t stream, miopen_tensile_mat
 {
     auto problem = create_tensile_problem(deref(a), deref(b), deref(c));
     auto hardware = Tensile::hip::GetCurrentDevice();
-    auto solution = library().FindBestSolution(problem, *hardware);
+    auto solution = library().findBestSolution(problem, *hardware);
     Tensile::TypedContractionInputs<float> inputs;
-    inputs.a = a->data;
-    inputs.b = b->data;
-    inputs.c = c->data;
-    // inputs.d = d.data;
-    auto kernels = solution.solve(problem, inputs, *hardware);
+    inputs.a = reinterpret_cast<const float*>(a->data);
+    inputs.b = reinterpret_cast<const float*>(b->data);
+    inputs.c = reinterpret_cast<const float*>(c->data);
+    inputs.d = reinterpret_cast<float*>(c->data);
+    auto kernels = solution->solve(problem, inputs, *hardware);
     return miopen_tensile_status_success;
 }
 

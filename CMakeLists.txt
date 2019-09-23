@@ -13,13 +13,21 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 include(virtualenv)
 
-if(NOT Tensile_FOUND)
-    # Use the virtual-env setup and download package from specified repo:
-    set( MIOPEN_TENSILE_TAG 6f6d746cfcfa650d05381325601091ec934638f1 CACHE STRING "Tensile tag to download" )
-    virtualenv_install("git+https://github.com/ROCmSoftwarePlatform/Tensile.git@${MIOPEN_TENSILE_TAG}")
-    list(APPEND CMAKE_PREFIX_PATH ${VIRTUALENV_HOME_DIR})
-endif()
-find_package(Tensile REQUIRED)
+# Workaround broken hcc-config
+macro(add_library NAME)
+    if(${NAME} STREQUAL "hsa-runtime64")
+        _add_library(hsa-runtime64 SHARED IMPORTED)
+    else()
+        _add_library(${NAME} ${ARGN})
+    endif()
+endmacro()
+
+# Use the virtual-env setup and download package from specified repo:
+set( MIOPEN_TENSILE_TAG b9ca88f4334b8091b50f716a0951bd9a5b994127 CACHE STRING "Tensile tag to download" )
+virtualenv_install("git+https://github.com/ROCmSoftwarePlatform/Tensile.git@${MIOPEN_TENSILE_TAG}")
+list(APPEND CMAKE_PREFIX_PATH ${VIRTUALENV_HOME_DIR})
+
+find_package(Tensile REQUIRED COMPONENTS HIP LLVM)
 
 TensileCreateLibraryFiles(
     "${CMAKE_CURRENT_SOURCE_DIR}/yaml"
@@ -34,7 +42,8 @@ find_package(hip)
 add_library(MIOpenTensile src/gemm_api.cpp)
 target_include_directories(MIOpenTensile PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
 target_link_libraries(MIOpenTensile PUBLIC hip::host)
-target_link_libraries(MIOpenTensile PRIVATE miopen_tensile_kernels hip::device)
+target_link_libraries(MIOpenTensile PRIVATE TensileHost miopen_tensile_kernels hip::device)
 
-
+add_executable(main src/main.cpp)
+target_link_libraries(main MIOpenTensile)
 
