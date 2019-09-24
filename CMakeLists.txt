@@ -37,6 +37,7 @@ TensileCreateLibraryFiles(
     VAR_PREFIX MIOPEN_TENSILE
     )
 
+
 find_package(hip)
 
 add_library(MIOpenTensile src/gemm_api.cpp)
@@ -45,5 +46,5 @@ target_link_libraries(MIOpenTensile PUBLIC hip::host)
 target_link_libraries(MIOpenTensile PRIVATE TensileHost miopen_tensile_kernels hip::device)
 
 add_executable(main src/main.cpp)
-target_link_libraries(main MIOpenTensile)
+target_link_libraries(main MIOpenTensile hip::device)
 
