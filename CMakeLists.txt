@@ -45,6 +45,5 @@ target_include_directories(MIOpenTensile PUBLIC $<BUILD_INTERFACE:${CMAKE_CURREN
 target_link_libraries(MIOpenTensile PUBLIC hip::host)
 target_link_libraries(MIOpenTensile PRIVATE TensileHost miopen_tensile_kernels hip::device)
 
-add_executable(main src/main.cpp)
-target_link_libraries(main MIOpenTensile hip::device)
+add_subdirectory(test)
 

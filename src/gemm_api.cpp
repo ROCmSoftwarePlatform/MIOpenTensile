@@ -21,7 +21,7 @@ const auto& library()
 
 bool is_transposed(const miopen_tensile_matrix& a)
 {
-    return a.strides[0] > a.strides[1];
+    return a.strides[1] > a.strides[0];
 }
 
 size_t get_ld(const miopen_tensile_matrix& a)
@@ -41,6 +41,11 @@ miopen_tensile_status miopen_tensile_gemm(hipStream_t stream, miopen_tensile_mat
     auto problem = create_tensile_problem(deref(a), deref(b), deref(c));
     auto hardware = Tensile::hip::GetCurrentDevice();
     auto solution = library().findBestSolution(problem, *hardware);
+    if (not solution)
+    {
+        std::cerr << "No solution found." << std::endl;
+        return miopen_tensile_status_no_solution;
+    }
     Tensile::TypedContractionInputs<float> inputs;
     inputs.a = reinterpret_cast<const float*>(a->data);
     inputs.b = reinterpret_cast<const float*>(b->data);

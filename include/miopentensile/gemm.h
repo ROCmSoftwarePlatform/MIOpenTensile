@@ -13,7 +13,8 @@ extern "C" {
 
 typedef enum {
     miopen_tensile_status_success = 0, /*!< No errors */
-    miopen_tensile_status_unknown = 1, /*!< Unknown error occurred.. */
+    miopen_tensile_status_no_solution = 1, /*!< No solution found for configuration.. */
+    miopen_tensile_status_unknown = 2, /*!< Unknown error occurred.. */
 } miopen_tensile_status;
 
 typedef size_t miopen_tensile_2d[2];
