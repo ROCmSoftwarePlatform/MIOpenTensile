@@ -66,6 +66,14 @@ std::vector<T> generate(std::size_t sz, T start)
 }
 
 template<class T>
+std::vector<T> fill(std::size_t sz, T value)
+{
+    std::vector<T> result(sz);
+    std::fill(result.begin(), result.end(), value);
+    return result;
+}
+
+template<class T>
 std::vector<T> cpu_gemm(std::size_t n)
 {
     auto a = generate<T>(n*n, 1);
@@ -86,7 +94,7 @@ std::vector<T> gpu_gemm(std::size_t n)
     };
     auto a = to_gpu(generate<T>(n*n, 1));
     auto b = to_gpu(generate<T>(n*n, 2));
-    auto c = to_gpu(generate<T>(n*n, 0));
+    auto c = to_gpu(fill<T>(n*n, 0));
     auto am = create_matrix(a);
     auto bm = create_matrix(b, true);
     auto cm = create_matrix(c);
