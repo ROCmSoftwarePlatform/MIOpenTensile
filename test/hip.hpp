@@ -3,6 +3,7 @@
 
 #include "manage_ptr.hpp"
 #include <hip/hip_runtime_api.h>
+#include <vector>
 #include <stdexcept>
 
 namespace mitensile {

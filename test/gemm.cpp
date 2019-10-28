@@ -101,13 +101,14 @@ std::vector<T> gpu_gemm(std::size_t n)
 
     auto stream = create_stream();
     miopen_tensile_gemm(stream.get(), &am, &bm, &cm);
-    return from_gpu<T>(cm.data, n*n);
+    auto r = from_gpu<T>(cm.data, n*n);
+    return r;
 }
 
 TEST_CASE(gemm1)
 {
-    auto cpu = cpu_gemm<float>(2);
-    auto gpu = gpu_gemm<float>(2);
+    auto cpu = cpu_gemm<float>(4);
+    auto gpu = gpu_gemm<float>(4);
     EXPECT(cpu == gpu);
 }
 
