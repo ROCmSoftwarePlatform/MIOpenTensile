@@ -51,6 +51,8 @@ miopen_tensile_status miopen_tensile_gemm(hipStream_t stream, miopen_tensile_mat
     inputs.b = reinterpret_cast<const float*>(b->data);
     inputs.c = reinterpret_cast<const float*>(c->data);
     inputs.d = reinterpret_cast<float*>(c->data);
+    inputs.alpha = 1;
+    inputs.beta = 0;
     auto kernels = solution->solve(problem, inputs, *hardware);
     Tensile::hip::SolutionAdapter adapter{};
     adapter.loadEmbeddedCodeObjects("miopen_tensile_kernels");
