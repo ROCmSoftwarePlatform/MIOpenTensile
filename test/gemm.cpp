@@ -1,6 +1,7 @@
 #include <miopentensile/gemm.h>
 #include <algorithm>
 #include <numeric>
+#include <sstream>
 #include "hip.hpp"
 #include "test.hpp"
 
@@ -33,30 +34,6 @@ void gemm(std::size_t n, std::size_t m, std::size_t k, AF a, BF b, CF c)
     });
 }
 
-template<class F>
-auto flip(F f)
-{
-    return [=](auto x, auto y) {
-        return f(y, x);
-    };
-}
-
-template <class T>
-auto with_stride(T& data, std::size_t stride)
-{
-    return [&data, stride](auto x, auto y) -> auto& {
-        return data.at(x* stride + y);
-    };
-}
-
-template <class T>
-auto with_stride(T* data, std::size_t stride)
-{
-    return [&data, stride](auto x, auto y) -> auto& {
-        return data[x* stride + y];
-    };
-}
-
 template<class T>
 std::vector<T> generate(std::size_t sz, T start)
 {
@@ -73,43 +50,148 @@ std::vector<T> fill(std::size_t sz, T value)
     return result;
 }
 
-template<class T>
-std::vector<T> cpu_gemm(std::size_t n)
+template <class Iterator>
+inline std::string to_string_range(Iterator start, Iterator last)
 {
-    auto a = generate<T>(n*n, 1);
-    auto b = generate<T>(n*n, 2);
-    auto c = generate<T>(n*n, 0);
-    gemm(n, n, n, with_stride(a, n), with_stride(b, n), with_stride(c, n));
-    return c;
+    std::stringstream ss;
+    if(start != last)
+    {
+        ss << *start;
+        std::for_each(std::next(start), last, [&](auto&& x) { ss << ", " << x; });
+    }
+    return ss.str();
+}
+
+struct shape
+{
+    std::vector<std::size_t> lens;
+    std::vector<std::size_t> strides;
+    void calculate_strides()
+    {
+        strides.clear();
+        strides.resize(lens.size(), 0);
+        if(strides.empty())
+            return;
+        strides.back() = 1;
+        std::partial_sum(lens.rbegin(),
+                         lens.rend() - 1,
+                         strides.rbegin() + 1,
+                         std::multiplies<std::size_t>());
+    }
+
+    std::size_t element_space() const
+    {
+        assert(lens.size() == strides.size());
+        if(lens.empty())
+            return 0;
+        return std::inner_product(lens.begin(),
+                                  lens.end(),
+                                  strides.begin(),
+                                  std::size_t{0},
+                                  std::plus<std::size_t>{},
+                                  [](std::size_t l, std::size_t s) { return (l - 1) * s; }) +
+               1;
+    }
+
+    std::size_t elements() const
+    {
+        assert(lens.size() == strides.size());
+        if(lens.empty())
+            return 0;
+        return std::accumulate(
+            lens.begin(), lens.end(), std::size_t{1}, std::multiplies<std::size_t>());
+    }
+
+    std::size_t index(const std::vector<std::size_t>& l) const
+    {
+        assert(l.size() <= this->lens.size());
+        assert(this->lens.size() == this->strides.size());
+        return std::inner_product(l.begin(), l.end(), this->strides.begin(), std::size_t{0});
+    }
+
+    template<class T>
+    std::vector<T> generate(std::size_t seed=0) const
+    {
+        return mitensile::generate<T>(element_space(), seed);
+    }
+
+    template<class T>
+    std::vector<T> fill(std::size_t x=0) const
+    {
+        return mitensile::fill<T>(element_space(), x);
+    }
+
+    friend std::ostream& operator<<(std::ostream& os, const shape& x)
+    {
+        os << "{" << to_string_range(x.lens.begin(), x.lens.end()) << "}, ";
+        os << "{" << to_string_range(x.strides.begin(), x.strides.end()) << "}";
+        return os;
+    }
+
+};
+
+shape create_mat_shape(std::size_t x, std::size_t y, bool transposed = false)
+{
+    if (transposed)
+        return {{x, y}, {1, y}};
+    else
+        return {{x, y}, {y, 1}};
+}
+
+template<class R>
+auto shape_with(const shape& s, R&& x)
+{
+    return [&](std::size_t i, std::size_t j) -> auto& {
+        return x[s.index({i, j})];
+    };
 }
 
 template<class T>
-std::vector<T> gpu_gemm(std::size_t n)
+std::vector<T> cpu_gemm(shape as, shape bs, shape cs)
 {
-    auto create_matrix = [&](auto& x, bool transposed = false) {
-        if (transposed)
-            return miopen_tensile_matrix{{n, n}, {1, n}, x.get()};
-        else
-            return miopen_tensile_matrix{{n, n}, {n, 1}, x.get()};
-    };
-    auto a = to_gpu(generate<T>(n*n, 1));
-    auto b = to_gpu(generate<T>(n*n, 2));
-    auto c = to_gpu(fill<T>(n*n, 0));
-    auto am = create_matrix(a);
-    auto bm = create_matrix(b, true);
-    auto cm = create_matrix(c);
+    auto a = as.generate<T>(1);
+    auto b = bs.generate<T>(2);
+    auto c = cs.fill<T>(0);
+    gemm(as.lens[0], bs.lens[1], as.lens[1], shape_with(as, a), shape_with(bs, b), shape_with(cs, c));
+    return c;
+}
+
+template<class Ptr>
+miopen_tensile_matrix to_tensile_matrix(shape s, const Ptr& p)
+{
+    return miopen_tensile_matrix{{s.lens[0], s.lens[1]}, {s.strides[0], s.strides[1]}, p.get()};
+}
+
+template<class T>
+std::vector<T> gpu_gemm(shape as, shape bs, shape cs)
+{
+    auto a = to_gpu(as.generate<T>(1));
+    auto b = to_gpu(bs.generate<T>(2));
+    auto c = to_gpu(cs.fill<T>(0));
+    auto am = to_tensile_matrix(as, a);
+    auto bm = to_tensile_matrix(bs, b);
+    auto cm = to_tensile_matrix(cs, c);
 
     auto stream = create_stream();
     miopen_tensile_gemm(stream.get(), &am, &bm, &cm);
-    auto r = from_gpu<T>(cm.data, n*n);
+    auto r = from_gpu<T>(cm.data, cs.element_space());
     return r;
+}
+
+template<class T>
+void verify_gemm(shape as, shape bs, shape cs)
+{
+    std::cout << "a = " << as << std::endl;
+    std::cout << "b = " << bs << std::endl;
+    std::cout << "c = " << cs << std::endl;
+    auto cpu = cpu_gemm<T>(as, bs, cs);
+    auto gpu = gpu_gemm<T>(as, bs, cs);
+    EXPECT(cpu == gpu);
 }
 
 TEST_CASE(gemm1)
 {
-    auto cpu = cpu_gemm<float>(4);
-    auto gpu = gpu_gemm<float>(4);
-    EXPECT(cpu == gpu);
+    verify_gemm<float>(create_mat_shape(2, 2), create_mat_shape(2, 2, true), create_mat_shape(2, 2));
 }
 
 
