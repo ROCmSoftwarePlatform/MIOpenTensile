@@ -181,9 +181,9 @@ std::vector<T> gpu_gemm(shape as, shape bs, shape cs)
 template<class T>
 void verify_gemm(shape as, shape bs, shape cs)
 {
-    std::cout << "a = " << as << std::endl;
-    std::cout << "b = " << bs << std::endl;
-    std::cout << "c = " << cs << std::endl;
+    std::cout << "a -> " << as << std::endl;
+    std::cout << "b -> " << bs << std::endl;
+    std::cout << "c -> " << cs << std::endl;
     auto cpu = cpu_gemm<T>(as, bs, cs);
     auto gpu = gpu_gemm<T>(as, bs, cs);
     EXPECT(cpu == gpu);

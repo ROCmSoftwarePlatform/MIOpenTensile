@@ -5,8 +5,6 @@
 #include <Tensile/hip/HipHardware.hpp>
 #include <Tensile/hip/HipSolutionAdapter.hpp>
 
-#define DEBUG_PRINT(x) std::cout << #x ": " << x << std::endl;
-
 template<class T>
 auto& deref(T* x)
 {
@@ -43,14 +41,6 @@ miopen_tensile_matrix transpose(const miopen_tensile_matrix& a)
 
 Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& a, const miopen_tensile_matrix& b, const miopen_tensile_matrix& c)
 {
-    DEBUG_PRINT(is_transposed(a));
-    DEBUG_PRINT(is_transposed(b));
-    DEBUG_PRINT(a.lens[0]);
-    DEBUG_PRINT(b.lens[1]);
-    DEBUG_PRINT(a.lens[1]);
-    DEBUG_PRINT(get_ld(a));
-    DEBUG_PRINT(get_ld(b));
-    DEBUG_PRINT(get_ld(c));
     return Tensile::ContractionProblem::GEMM(is_transposed(a), is_transposed(b), a.lens[0], b.lens[1], a.lens[1], get_ld(a), get_ld(b), get_ld(c), 1.0, false, 1);
 }
 
