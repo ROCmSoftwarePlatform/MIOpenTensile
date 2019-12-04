@@ -191,7 +191,7 @@ void verify_gemm(shape as, shape bs, shape cs)
 
 TEST_CASE(gemm1)
 {
-    verify_gemm<float>(create_mat_shape(2, 2), create_mat_shape(2, 2, true), create_mat_shape(2, 2));
+    verify_gemm<float>(create_mat_shape(2, 2, true), create_mat_shape(2, 2), create_mat_shape(2, 2));
 }
 
 

@@ -58,7 +58,7 @@ extern "C" {
 
 miopen_tensile_status miopen_tensile_gemm(hipStream_t stream, miopen_tensile_matrix* a, miopen_tensile_matrix* b, miopen_tensile_matrix* c)
 {
-    auto problem = create_tensile_problem(transpose(deref(b)), transpose(deref(a)), deref(c));
+    auto problem = create_tensile_problem(deref(b), deref(a), deref(c));
     auto hardware = Tensile::hip::GetCurrentDevice();
     auto solution = library().findBestSolution(problem, *hardware);
     if (not solution)
