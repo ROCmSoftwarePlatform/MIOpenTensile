@@ -85,7 +85,12 @@ Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& 
 
 extern "C" {
 
-miopen_tensile_status miopen_tensile_gemm(hipStream_t stream, miopen_tensile_matrix* a, miopen_tensile_matrix* b, miopen_tensile_matrix* c)
+miopen_tensile_status miopen_tensile_gemm(hipStream_t stream, 
+                                          miopen_tensile_matrix* a, 
+                                          miopen_tensile_matrix* b, 
+                                          miopen_tensile_matrix* c, 
+                                          double alpha, 
+                                          double beta)
 {
     auto problem = create_tensile_problem(deref(b), deref(a), deref(c));
     auto hardware = Tensile::hip::GetCurrentDevice();
@@ -100,8 +105,8 @@ miopen_tensile_status miopen_tensile_gemm(hipStream_t stream, miopen_tensile_mat
     inputs.b = reinterpret_cast<const float*>(a->data);
     inputs.c = reinterpret_cast<const float*>(c->data);
     inputs.d = reinterpret_cast<float*>(c->data);
-    inputs.alpha = 1;
-    inputs.beta = 1;
+    inputs.alpha = alpha;
+    inputs.beta = beta;
     auto kernels = solution->solve(problem, inputs, *hardware);
     Tensile::hip::SolutionAdapter adapter{};
     adapter.loadEmbeddedCodeObjects("miopen_tensile_kernels");
