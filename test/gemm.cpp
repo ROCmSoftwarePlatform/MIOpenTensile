@@ -108,6 +108,29 @@ struct shape
         assert(this->lens.size() == this->strides.size());
         return std::inner_product(l.begin(), l.end(), this->strides.begin(), std::size_t{0});
     }
+    std::size_t index_ik(std::vector<std::size_t> l, std::size_t k) const
+    {
+        l.back() = k;
+        return this->index(l);
+    }
+
+    std::size_t index_kj(std::vector<std::size_t> l, std::size_t k) const
+    {
+        l.at(l.size() - 2) = k;
+        return this->index(l);
+    }
+
+    shape transpose() const
+    {
+        assert(lens.size() == strides.size());
+        shape r = *this;
+        if (r.lens.size() > 1) 
+        {
+            std::reverse(r.lens.end()-2, r.lens.end());
+            std::reverse(r.strides.end()-2, r.strides.end());
+        }
+        return r;
+    }
 
     template<class T>
     std::vector<T> generate(std::size_t seed=0) const
@@ -121,6 +144,36 @@ struct shape
         return mitensile::fill<T>(element_space(), x);
     }
 
+    static shape from_lens(std::vector<std::size_t> l)
+    {
+        shape r;
+        r.lens = l;
+        r.calculate_strides();
+        return r;
+    }
+
+    template <class F>
+    void for_each(F f)
+    {
+        assert(lens.size() == strides.size());
+        // Ensure calls to f use const ref to vector
+        auto call = [&f](const std::vector<std::size_t>& i) { f(i); };
+        std::vector<std::size_t> indices(lens.size());
+        shape ss = from_lens(lens);
+        for(std::size_t i = 0; i < ss.elements(); i++)
+        {
+            std::transform(ss.strides.begin(),
+                           ss.strides.end(),
+                           ss.lens.begin(),
+                           indices.begin(),
+                           [&](std::size_t stride, std::size_t len) {
+                               assert(len > 0 and stride > 0);
+                               return (i / stride) % len;
+                           });
+            call(indices);
+        }
+    }
+
     friend std::ostream& operator<<(std::ostream& os, const shape& x)
     {
         os << "{" << to_string_range(x.lens.begin(), x.lens.end()) << "}, ";
@@ -129,14 +182,6 @@ struct shape
     }
 
 };
-
-shape create_mat_shape(std::size_t x, std::size_t y, bool transposed = false)
-{
-    if (transposed)
-        return {{x, y}, {1, y}};
-    else
-        return {{x, y}, {y, 1}};
-}
 
 template<class R>
 auto shape_with(const shape& s, R&& x)
@@ -152,14 +197,27 @@ std::vector<T> cpu_gemm(shape as, shape bs, shape cs)
     auto a = as.generate<T>(1);
     auto b = bs.generate<T>(2);
     auto c = cs.fill<T>(0);
-    gemm(as.lens[0], bs.lens[1], as.lens[1], shape_with(as, a), shape_with(bs, b), shape_with(cs, c));
+    auto k = as.lens.back();
+    cs.for_each([&](auto idx) {
+        double x = 0.0;
+        dfor(k)([&](int kk) { 
+            // x += a(i, kk) * b(kk, j); 
+            x += a[as.index_ik(idx, kk)] * b[bs.index_kj(idx, kk)]; 
+        });
+        c[cs.index(idx)] = x;
+    });
     return c;
 }
 
 template<class Ptr>
 miopen_tensile_matrix to_tensile_matrix(shape s, const Ptr& p)
 {
-    return miopen_tensile_matrix{{s.lens[0], s.lens[1]}, {s.strides[0], s.strides[1]}, p.get()};
+    if (s.lens.size() == 2)
+        return miopen_tensile_matrix{{s.lens[0], s.lens[1]}, {s.strides[0], s.strides[1]}, {0, 0}, p.get()};
+    else if (s.lens.size() == 3)
+        return miopen_tensile_matrix{{s.lens[1], s.lens[2]}, {s.strides[1], s.strides[2]}, {s.lens[0], s.strides[0]}, p.get()};
+    else
+        throw std::runtime_error("Invalid shape to to_tensile_matrix");
 }
 
 template<class T>
@@ -173,7 +231,9 @@ std::vector<T> gpu_gemm(shape as, shape bs, shape cs)
     auto cm = to_tensile_matrix(cs, c);
 
     auto stream = create_stream();
-    miopen_tensile_gemm(stream.get(), &am, &bm, &cm);
+    auto e = miopen_tensile_gemm(stream.get(), &am, &bm, &cm);
+    if (e != miopen_tensile_status_success)
+        throw std::runtime_error("Failed to run miopen_tensile_gemm");
     auto r = from_gpu<T>(cm.data, cs.element_space());
     return r;
 }
@@ -189,9 +249,27 @@ void verify_gemm(shape as, shape bs, shape cs)
     EXPECT(cpu == gpu);
 }
 
+shape create_mat_shape(std::vector<std::size_t> l, bool transposed = false)
+{
+    auto s = shape::from_lens(l);
+    if (transposed)
+        return s.transpose();
+    else
+        return s;
+}
+
 TEST_CASE(gemm1)
 {
-    verify_gemm<float>(create_mat_shape(2, 2, true), create_mat_shape(2, 2), create_mat_shape(2, 2));
+    verify_gemm<float>(create_mat_shape({2, 2}, true),
+                       create_mat_shape({2, 2}), 
+                       create_mat_shape({2, 2}));
+}
+
+TEST_CASE(bgemm1)
+{
+    verify_gemm<float>(create_mat_shape({2, 2, 2}),
+                       create_mat_shape({2, 2, 2}), 
+                       create_mat_shape({2, 2, 2}));
 }
 
 

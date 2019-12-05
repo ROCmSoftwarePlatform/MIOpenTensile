@@ -20,9 +20,16 @@ typedef enum {
 typedef size_t miopen_tensile_2d[2];
 
 typedef struct
+{    
+    size_t num;
+    size_t stride;
+} miopen_tensile_batch;
+
+typedef struct
 {
     miopen_tensile_2d lens;
     miopen_tensile_2d strides;
+    miopen_tensile_batch batch;
     void* data;
 } miopen_tensile_matrix;
 

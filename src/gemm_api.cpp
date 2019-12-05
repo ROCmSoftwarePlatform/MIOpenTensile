@@ -34,6 +34,11 @@ size_t get_ld(const miopen_tensile_matrix& a)
     return a.strides[get_idx(a, 0)];
 }
 
+Tensile::DataType get_data_type(const miopen_tensile_matrix&)
+{
+    return Tensile::DataType::Float;
+}
+
 miopen_tensile_matrix transpose(const miopen_tensile_matrix& a)
 {
     return miopen_tensile_matrix{{a.lens[1], a.lens[0]}, {a.strides[1], a.strides[0]}};
@@ -41,7 +46,41 @@ miopen_tensile_matrix transpose(const miopen_tensile_matrix& a)
 
 Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& a, const miopen_tensile_matrix& b, const miopen_tensile_matrix& c)
 {
-    return Tensile::ContractionProblem::GEMM(is_transposed(a), is_transposed(b), a.lens[0], b.lens[1], a.lens[1], get_ld(a), get_ld(b), get_ld(c), 1.0, false, 1);
+    if (a.batch.num > 0 or b.batch.num > 0 or c.batch.num > 0)
+    {
+        auto batch = std::max({a.batch.num, b.batch.num, c.batch.num});
+        return Tensile::ContractionProblem::GEMM_Strides(is_transposed(a), 
+                                                         is_transposed(b), 
+                                                         get_data_type(a), 
+                                                         get_data_type(b), 
+                                                         get_data_type(c), 
+                                                         get_data_type(c), 
+                                                         a.lens[0], 
+                                                         b.lens[1], 
+                                                         a.lens[1],
+                                                         batch, 
+                                                         get_ld(a),
+                                                         a.batch.stride, 
+                                                         get_ld(b),
+                                                         b.batch.stride, 
+                                                         get_ld(c),
+                                                         c.batch.stride,
+                                                         get_ld(c),
+                                                         c.batch.stride,
+                                                         1.0);
+    }
+    else
+        return Tensile::ContractionProblem::GEMM(is_transposed(a),
+                                                 is_transposed(b), 
+                                                 a.lens[0], 
+                                                 b.lens[1], 
+                                                 a.lens[1], 
+                                                 get_ld(a), 
+                                                 get_ld(b), 
+                                                 get_ld(c), 
+                                                 1.0, 
+                                                 false, 
+                                                 1);
 }
 
 extern "C" {
