@@ -231,9 +231,9 @@ std::vector<T> gpu_gemm(shape as, shape bs, shape cs)
     auto cm = to_tensile_matrix(cs, c);
 
     auto stream = create_stream();
-    auto e = miopen_tensile_gemm(stream.get(), &am, &bm, &cm, 1.0, 0.0);
+    auto e = miopen_tensile_gemm_hip(stream.get(), &am, &bm, &cm, 1.0, 0.0);
     if (e != miopen_tensile_status_success)
-        throw std::runtime_error("Failed to run miopen_tensile_gemm");
+        throw std::runtime_error("Failed to run miopen_tensile_gemm_hip");
     auto r = from_gpu<T>(cm.data, cs.element_space());
     return r;
 }

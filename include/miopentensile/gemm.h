@@ -33,12 +33,12 @@ typedef struct
     void* data;
 } miopen_tensile_matrix;
 
-miopen_tensile_status miopen_tensile_gemm(hipStream_t stream, 
-                                          miopen_tensile_matrix* a, 
-                                          miopen_tensile_matrix* b, 
-                                          miopen_tensile_matrix* c, 
-                                          double alpha, 
-                                          double beta);
+miopen_tensile_status miopen_tensile_gemm_hip(hipStream_t stream, 
+                                              miopen_tensile_matrix* a, 
+                                              miopen_tensile_matrix* b, 
+                                              miopen_tensile_matrix* c, 
+                                              double alpha, 
+                                              double beta);
 
 #ifdef __cplusplus
 }

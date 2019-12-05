@@ -85,12 +85,12 @@ Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& 
 
 extern "C" {
 
-miopen_tensile_status miopen_tensile_gemm(hipStream_t stream, 
-                                          miopen_tensile_matrix* a, 
-                                          miopen_tensile_matrix* b, 
-                                          miopen_tensile_matrix* c, 
-                                          double alpha, 
-                                          double beta)
+miopen_tensile_status miopen_tensile_gemm_hip(hipStream_t stream, 
+                                              miopen_tensile_matrix* a, 
+                                              miopen_tensile_matrix* b, 
+                                              miopen_tensile_matrix* c, 
+                                              double alpha, 
+                                              double beta)
 {
     auto problem = create_tensile_problem(deref(b), deref(a), deref(c));
     auto hardware = Tensile::hip::GetCurrentDevice();
