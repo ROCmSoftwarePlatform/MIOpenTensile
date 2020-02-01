@@ -13,9 +13,14 @@ auto& deref(T* x)
     return *x;
 }
 
+auto create_library()
+{
+    return Tensile::EmbeddedLibrary<Tensile::ContractionProblem>::NewLibrary("miopen_tensile_kernels");
+}
+
 const auto& library()
 {
-    static auto result = Tensile::EmbeddedLibrary<Tensile::ContractionProblem>::NewLibrary("miopen_tensile_kernels");
+    static auto result = create_library();
     return *result;
 }
 

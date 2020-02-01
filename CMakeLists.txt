@@ -8,6 +8,13 @@ add_definitions(-std=c++14)
 list(APPEND CMAKE_PREFIX_PATH /opt/rocm/hcc /opt/rocm/hip /opt/rocm)
 
 find_package( ROCM CONFIG QUIET PATHS /opt/rocm )
+include(ROCMInstallTargets)
+include(ROCMSetupVersion)
+
+rocm_setup_version(VERSION 1.0)
+
+# Dont build as shared as a workaround
+# option( BUILD_SHARED_LIBS "Build as a shared library" ON )
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
@@ -37,13 +44,24 @@ TensileCreateLibraryFiles(
     VAR_PREFIX MIOPEN_TENSILE
     )
 
-
 find_package(hip)
 
-add_library(MIOpenTensile src/gemm_api.cpp)
-target_include_directories(MIOpenTensile PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
+add_library(MIOpenTensile SHARED src/gemm_api.cpp)
 target_link_libraries(MIOpenTensile PUBLIC hip::host)
-target_link_libraries(MIOpenTensile PRIVATE TensileHost miopen_tensile_kernels hip::device)
+target_link_libraries(MIOpenTensile PRIVATE TensileHost miopen_tensile_kernels)
+
+
+rocm_install_targets(
+  TARGETS MIOpenTensile
+  INCLUDE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+rocm_export_targets(
+  TARGETS MIOpenTensile
+  DEPENDS
+    hip
+)
 
 add_subdirectory(test)
 
