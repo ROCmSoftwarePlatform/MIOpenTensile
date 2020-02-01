@@ -213,9 +213,9 @@ template<class Ptr>
 miopen_tensile_matrix to_tensile_matrix(shape s, const Ptr& p)
 {
     if (s.lens.size() == 2)
-        return miopen_tensile_matrix{{s.lens[0], s.lens[1]}, {s.strides[0], s.strides[1]}, {0, 0}, p.get()};
+        return miopen_tensile_matrix{{s.lens[0], s.lens[1]}, {s.strides[0], s.strides[1]}, {0, 0}, miopen_tensile_type_float, p.get()};
     else if (s.lens.size() == 3)
-        return miopen_tensile_matrix{{s.lens[1], s.lens[2]}, {s.strides[1], s.strides[2]}, {s.lens[0], s.strides[0]}, p.get()};
+        return miopen_tensile_matrix{{s.lens[1], s.lens[2]}, {s.strides[1], s.strides[2]}, {s.lens[0], s.strides[0]}, miopen_tensile_type_float, p.get()};
     else
         throw std::runtime_error("Invalid shape to to_tensile_matrix");
 }

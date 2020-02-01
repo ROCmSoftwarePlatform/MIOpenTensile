@@ -17,6 +17,10 @@ typedef enum {
     miopen_tensile_status_unknown = 2, /*!< Unknown error occurred.. */
 } miopen_tensile_status;
 
+typedef enum {
+    miopen_tensile_type_float = 0
+} miopen_tensile_type;
+
 typedef size_t miopen_tensile_2d[2];
 
 typedef struct
@@ -30,6 +34,7 @@ typedef struct
     miopen_tensile_2d lens;
     miopen_tensile_2d strides;
     miopen_tensile_batch batch;
+    miopen_tensile_type type;
     void* data;
 } miopen_tensile_matrix;
 
