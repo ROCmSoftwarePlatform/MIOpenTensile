@@ -28,14 +28,19 @@ macro(add_library NAME)
         _add_library(${NAME} ${ARGN})
     endif()
 endmacro()
+find_package(hip)
 
 # Use the virtual-env setup and download package from specified repo:
 set( MIOPEN_TENSILE_TAG b9ca88f4334b8091b50f716a0951bd9a5b994127 CACHE STRING "Tensile tag to download" )
+virtualenv_install(wheel)
 virtualenv_install("git+https://github.com/ROCmSoftwarePlatform/Tensile.git@${MIOPEN_TENSILE_TAG}")
 list(APPEND CMAKE_PREFIX_PATH ${VIRTUALENV_HOME_DIR})
 
 find_package(Tensile REQUIRED COMPONENTS HIP LLVM)
 
+# Workaround broke tensile cmake
+get_filename_component(COMPILER_PATH ${CMAKE_CXX_COMPILER} DIRECTORY)
+set(ENV{PATH} "${hip_BIN_INSTALL_DIR}:${COMPILER_PATH}:$ENV{PATH}")
 TensileCreateLibraryFiles(
     "${CMAKE_CURRENT_SOURCE_DIR}/yaml"
     "${CMAKE_CURRENT_BINARY_DIR}/yaml"
@@ -44,7 +49,6 @@ TensileCreateLibraryFiles(
     VAR_PREFIX MIOPEN_TENSILE
     )
 
-find_package(hip)
 
 add_library(MIOpenTensile SHARED src/gemm_api.cpp)
 target_link_libraries(MIOpenTensile PUBLIC hip::host)
