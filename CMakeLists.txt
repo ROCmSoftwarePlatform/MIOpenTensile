@@ -54,6 +54,14 @@ add_library(MIOpenTensile SHARED src/gemm_api.cpp)
 target_link_libraries(MIOpenTensile PUBLIC hip::host)
 target_link_libraries(MIOpenTensile PRIVATE TensileHost miopen_tensile_kernels)
 
+include(ROCMCreatePackage)
+rocm_create_package(
+    NAME MIOpenTensile
+    DESCRIPTION "MIOpen and Tensile integration library"
+    MAINTAINER "Paul Fultz II <paul.fultz@amd.com>"
+    LDCONFIG
+    DEPENDS hip-hcc
+)
 
 rocm_install_targets(
   TARGETS MIOpenTensile
