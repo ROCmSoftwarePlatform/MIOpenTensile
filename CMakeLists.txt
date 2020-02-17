@@ -13,6 +13,18 @@ include(ROCMSetupVersion)
 
 rocm_setup_version(VERSION 1.0)
 
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/lib)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/lib)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/bin)
+
+set( AMDGPU_TARGETS "gfx803;gfx900;gfx906" CACHE STRING "List of specific machine types for library to target" )
+
+if(AMDGPU_TARGETS MATCHES ";")
+    set(Tensile_ARCHITECTURE "all")
+else()
+    set(Tensile_ARCHITECTURE ${AMDGPU_TARGETS})
+endif()
+
 # Dont build as shared as a workaround
 # option( BUILD_SHARED_LIBS "Build as a shared library" ON )
 
@@ -30,8 +42,13 @@ macro(add_library NAME)
 endmacro()
 find_package(hip)
 
+option(BUILD_DEV "Build for development" OFF)
+set(MIOPEN_TENSILE_SRC asm_full)
+if(BUILD_DEV)
+    set(MIOPEN_TENSILE_SRC dev)
+endif()
 # Use the virtual-env setup and download package from specified repo:
-set( MIOPEN_TENSILE_TAG b9ca88f4334b8091b50f716a0951bd9a5b994127 CACHE STRING "Tensile tag to download" )
+set( MIOPEN_TENSILE_TAG 3761b8d9ffd7d6fdac9e7d5be3fa27fd8954614c CACHE STRING "Tensile tag to download" )
 virtualenv_install(wheel)
 virtualenv_install("git+https://github.com/ROCmSoftwarePlatform/Tensile.git@${MIOPEN_TENSILE_TAG}")
 list(APPEND CMAKE_PREFIX_PATH ${VIRTUALENV_HOME_DIR})
@@ -42,17 +59,16 @@ find_package(Tensile REQUIRED COMPONENTS HIP LLVM)
 get_filename_component(COMPILER_PATH ${CMAKE_CXX_COMPILER} DIRECTORY)
 set(ENV{PATH} "${hip_BIN_INSTALL_DIR}:${COMPILER_PATH}:$ENV{PATH}")
 TensileCreateLibraryFiles(
-    "${CMAKE_CURRENT_SOURCE_DIR}/yaml"
-    "${CMAKE_CURRENT_BINARY_DIR}/yaml"
-    EMBED_LIBRARY miopen_tensile_kernels
-    EMBED_KEY     miopen_tensile_kernels
+    "${CMAKE_CURRENT_SOURCE_DIR}/yaml/${MIOPEN_TENSILE_SRC}"
+    "${CMAKE_CURRENT_BINARY_DIR}/lib/miopentensile"
+    ARCHITECTURE ${Tensile_ARCHITECTURE}
     VAR_PREFIX MIOPEN_TENSILE
     )
 
 
 add_library(MIOpenTensile SHARED src/gemm_api.cpp)
 target_link_libraries(MIOpenTensile PUBLIC hip::host)
-target_link_libraries(MIOpenTensile PRIVATE TensileHost miopen_tensile_kernels)
+target_link_libraries(MIOpenTensile PRIVATE TensileHost)
 
 include(ROCMCreatePackage)
 rocm_create_package(

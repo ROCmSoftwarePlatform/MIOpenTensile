@@ -4,6 +4,23 @@
 #include <Tensile/EmbeddedLibrary.hpp>
 #include <Tensile/hip/HipHardware.hpp>
 #include <Tensile/hip/HipSolutionAdapter.hpp>
+#include <dlfcn.h>
+#include <glob.h>
+
+std::vector<std::string> glob_files(const std::string& s)
+{
+    std::vector<std::string> result;
+    glob_t raw_glob_result;
+    int e = glob(s.c_str(), GLOB_TILDE_CHECK | GLOB_NOSORT, nullptr, &raw_glob_result);
+    std::shared_ptr<std::remove_pointer_t<glob_t>> glob_result(&raw_glob_result, &globfree);
+
+    if (e != 0)
+        throw std::runtime_error("Glob failed: " + s);
+
+    for(std::size_t i = 0; i < glob_result->gl_pathc; ++i)
+        result.push_back(glob_result->gl_pathv[i]);
+    return result;
+}
 
 template<class T>
 auto& deref(T* x)
@@ -13,16 +30,51 @@ auto& deref(T* x)
     return *x;
 }
 
+std::string library_path()
+{
+    std::string path = "";
+    Dl_info info;
+
+    // Find the location of .so
+    if(dladdr((void*)miopen_tensile_gemm_hip, &info))
+    {
+        path = info.dli_fname;
+        auto i = path.rfind('/');
+        if (i != std::string::npos)
+            path = path.substr(0, i);
+        else
+            path = "";
+    }
+    return path + "/miopentensile/library/";
+}
+
 auto create_library()
 {
-    return Tensile::EmbeddedLibrary<Tensile::ContractionProblem>::NewLibrary("miopen_tensile_kernels");
+    return Tensile::LoadLibraryFile<Tensile::ContractionProblem>(library_path() + "TensileLibrary.yaml");
+    // return Tensile::EmbeddedLibrary<Tensile::ContractionProblem>::NewLibrary("miopen_tensile_kernels");
 }
 
 const auto& library()
 {
     static auto result = create_library();
+    assert(result != nullptr);
     return *result;
 }
+
+auto create_adaptor() {
+    // Workaround: The Tensile::hip::SolutionAdapter is not a regular type, so heap allocate it instead
+    auto a = std::make_shared<Tensile::hip::SolutionAdapter>();
+    for(auto&& f:glob_files(library_path() + "*co"))
+        a->loadCodeObjectFile(f);
+    return a;
+}
+
+auto& adaptor()
+{
+    static auto result = create_adaptor();
+    return *result;
+}
+
 
 bool is_transposed(const miopen_tensile_matrix& a)
 {
@@ -113,9 +165,7 @@ miopen_tensile_status miopen_tensile_gemm_hip(hipStream_t stream,
     inputs.alpha = alpha;
     inputs.beta = beta;
     auto kernels = solution->solve(problem, inputs, *hardware);
-    Tensile::hip::SolutionAdapter adapter{};
-    adapter.loadEmbeddedCodeObjects("miopen_tensile_kernels");
-    adapter.launchKernels(kernels, stream, nullptr, nullptr);
+    adaptor().launchKernels(kernels, stream, nullptr, nullptr);
     return miopen_tensile_status_success;
 }
 
