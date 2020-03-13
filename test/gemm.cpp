@@ -265,6 +265,30 @@ TEST_CASE(gemm1)
                        create_mat_shape({2, 2}));
 }
 
+TEST_CASE(gemm2)
+{
+    verify_gemm<float>(create_mat_shape({8, 4}),
+                       create_mat_shape({4, 32}), 
+                       create_mat_shape({8, 32}));
+}
+TEST_CASE(gemm3)
+{
+    verify_gemm<float>(create_mat_shape({4, 8}, true),
+                       create_mat_shape({4, 32}), 
+                       create_mat_shape({8, 32}));
+}
+TEST_CASE(gemm4)
+{
+    verify_gemm<float>(create_mat_shape({8, 4}),
+                       create_mat_shape({4, 32}), 
+                       create_mat_shape({8, 32}));
+}
+TEST_CASE(gemm5)
+{
+    verify_gemm<float>(create_mat_shape({64, 64}),
+                       create_mat_shape({64, 64}), 
+                       create_mat_shape({64, 64}));
+}
 TEST_CASE(bgemm1)
 {
     verify_gemm<float>(create_mat_shape({2, 2, 2}),
