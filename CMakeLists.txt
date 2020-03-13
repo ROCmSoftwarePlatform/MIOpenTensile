@@ -92,5 +92,7 @@ rocm_export_targets(
     hip
 )
 
+install(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lib/miopentensile" DESTINATION lib)
+
 add_subdirectory(test)
 
