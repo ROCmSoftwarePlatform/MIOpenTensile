@@ -103,7 +103,7 @@ miopen_tensile_matrix transpose(const miopen_tensile_matrix& a)
 
 Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& a, const miopen_tensile_matrix& b, const miopen_tensile_matrix& c)
 {
-    if (a.batch.num > 0 or b.batch.num > 0 or c.batch.num > 0)
+    if (a.batch.num > 1 or b.batch.num > 1 or c.batch.num > 1)
     {
         auto batch = std::max({a.batch.num, b.batch.num, c.batch.num});
         return Tensile::ContractionProblem::GEMM_Strides(is_transposed(a), 
@@ -112,9 +112,9 @@ Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& 
                                                          get_data_type(b), 
                                                          get_data_type(c), 
                                                          get_data_type(c), 
-                                                         a.lens[1], 
-                                                         b.lens[0], 
-                                                         a.lens[0],
+                                                         is_transposed(a) ? a.lens[0] : a.lens[1], 
+                                                         is_transposed(b) ? b.lens[1] : b.lens[0], 
+                                                         is_transposed(a) ? a.lens[1] : a.lens[0],
                                                          batch, 
                                                          get_ld(a),
                                                          a.batch.stride, 
@@ -129,9 +129,9 @@ Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& 
     else
         return Tensile::ContractionProblem::GEMM(is_transposed(a),
                                                  is_transposed(b), 
-                                                 a.lens[1], 
-                                                 b.lens[0], 
-                                                 a.lens[0], 
+                                                 is_transposed(a) ? a.lens[0] : a.lens[1], 
+                                                 is_transposed(b) ? b.lens[1] : b.lens[0], 
+                                                 is_transposed(a) ? a.lens[1] : a.lens[0], 
                                                  get_ld(a), 
                                                  get_ld(b), 
                                                  get_ld(c), 
