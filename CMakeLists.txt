@@ -70,6 +70,7 @@ TensileCreateLibraryFiles(
 add_library(MIOpenTensile SHARED src/gemm_api.cpp)
 target_link_libraries(MIOpenTensile PUBLIC hip::host)
 target_link_libraries(MIOpenTensile PRIVATE TensileHost)
+target_compile_definitions(MIOpenTensile PRIVATE __HIP_PLATFORM_HCC__)
 
 include(ROCMCreatePackage)
 rocm_create_package(
