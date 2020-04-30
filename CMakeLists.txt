@@ -73,6 +73,8 @@ target_link_libraries(MIOpenTensile PUBLIC hip::host)
 target_link_libraries(MIOpenTensile PRIVATE TensileHost)
 target_compile_definitions(MIOpenTensile PRIVATE __HIP_PLATFORM_HCC__)
 
+install(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lib/miopentensile" DESTINATION lib)
+
 include(ROCMCreatePackage)
 rocm_create_package(
     NAME MIOpenTensile
