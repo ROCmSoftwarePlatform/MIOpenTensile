@@ -13,7 +13,7 @@ include(ROCMSetupVersion)
 
 rocm_setup_version(VERSION 1.0)
 
-set(CMAKE_INSTALL_PREFIX "/usr/local" CACHE PATH "")
+set(CMAKE_INSTALL_PREFIX "/opt/rocm" CACHE PATH "")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/bin)
@@ -26,8 +26,6 @@ else()
     set(Tensile_ARCHITECTURE ${AMDGPU_TARGETS})
 endif()
 
-# Build options
-option(BUILD_TEST "Build tests" OFF)
 # Dont build as shared as a workaround
 # option( BUILD_SHARED_LIBS "Build as a shared library" ON )
 
@@ -96,23 +94,4 @@ rocm_export_targets(
     hip
 )
 
-install(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lib/miopentensile" DESTINATION lib)
-
-# Tests
-if(BUILD_TEST)
-  enable_testing()
-  add_subdirectory(test)
-endif()
-
-# Package
-set(CPACK_DEBIAN_PACKAGE_DEPENDS "rocm-dev (>= 2.5.27)")
-set(CPACK_RPM_PACKAGE_REQUIRES "rocm-dev >= 2.5.27")
-if(NOT CPACK_PACKAGING_INSTALL_PREFIX)
-  set(CPACK_PACKAGING_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
-endif()
-
-rocm_create_package(
-  NAME MIOpenTensile
-  DESCRIPTION "MIOpen-Tensile Tool"
-  MAINTAINER "Paul Fultz II <paul.fultz@amd.com>"
-)
+add_subdirectory(test)
