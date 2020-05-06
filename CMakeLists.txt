@@ -68,13 +68,17 @@ TensileCreateLibraryFiles(
     NO_MERGE_FILES
     )
 
+include(embed)
+
+file(GLOB CODE_OBJECTS "${CMAKE_CURRENT_BINARY_DIR}/lib/miopentensile/library/*co")
+add_embed_library(miopentensile_data ${CODE_OBJECTS})
 
 add_library(MIOpenTensile SHARED src/gemm_api.cpp)
 target_link_libraries(MIOpenTensile PUBLIC hip::host)
-target_link_libraries(MIOpenTensile PRIVATE TensileHost)
+target_link_libraries(MIOpenTensile PRIVATE TensileHost miopentensile_data)
 target_compile_definitions(MIOpenTensile PRIVATE __HIP_PLATFORM_HCC__)
 
-install(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lib/miopentensile" DESTINATION lib)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/lib/miopentensile/library/TensileLibrary.yaml" DESTINATION lib/miopentensile/library)
 
 include(ROCMCreatePackage)
 rocm_create_package(
