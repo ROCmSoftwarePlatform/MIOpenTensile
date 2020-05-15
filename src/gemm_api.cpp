@@ -6,6 +6,7 @@
 #include <Tensile/hip/HipSolutionAdapter.hpp>
 #include <dlfcn.h>
 #include <glob.h>
+#include <miopentensile_data.hpp>
 
 std::vector<std::string> glob_files(const std::string& s)
 {
@@ -64,8 +65,8 @@ const auto& library()
 auto create_adaptor() {
     // Workaround: The Tensile::hip::SolutionAdapter is not a regular type, so heap allocate it instead
     auto a = std::make_shared<Tensile::hip::SolutionAdapter>();
-    for(auto&& f:glob_files(library_path() + "*co"))
-        a->loadCodeObjectFile(f);
+    for(auto&& p:miopentensile_data())
+        a->loadCodeObject(p.second.first);
     return a;
 }
 
