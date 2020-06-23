@@ -58,6 +58,14 @@ list(APPEND CMAKE_PREFIX_PATH ${VIRTUALENV_HOME_DIR})
 find_package(Tensile REQUIRED COMPONENTS HIP LLVM)
 
 # Workaround broke tensile cmake
+if(CMAKE_CXX_COMPILER MATCHES ".*/hcc$")
+    set(COMPILER "hcc")
+    set(CODE_OBJECT_VERSION "V2")
+else()
+    set(COMPILER "hipcc")
+    set(CODE_OBJECT_VERSION "V3")
+endif()
+
 get_filename_component(COMPILER_PATH ${CMAKE_CXX_COMPILER} DIRECTORY)
 set(ENV{PATH} "${hip_BIN_INSTALL_DIR}:${COMPILER_PATH}:$ENV{PATH}")
 TensileCreateLibraryFiles(
@@ -65,8 +73,8 @@ TensileCreateLibraryFiles(
     "${CMAKE_CURRENT_BINARY_DIR}/lib/miopentensile"
     ARCHITECTURE ${Tensile_ARCHITECTURE}
     VAR_PREFIX MIOPEN_TENSILE
-    COMPILER "hcc"
-    CODE_OBJECT_VERSION "V2"
+    COMPILER ${COMPILER}
+    CODE_OBJECT_VERSION ${CODE_OBJECT_VERSION}
     )
 
 
