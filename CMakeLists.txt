@@ -66,6 +66,8 @@ else()
     set(CODE_OBJECT_VERSION "V3")
 endif()
 
+set_target_properties( TensileHost PROPERTIES POSITION_INDEPENDENT_CODE ON )
+
 get_filename_component(COMPILER_PATH ${CMAKE_CXX_COMPILER} DIRECTORY)
 set(ENV{PATH} "${hip_BIN_INSTALL_DIR}:${COMPILER_PATH}:$ENV{PATH}")
 TensileCreateLibraryFiles(
