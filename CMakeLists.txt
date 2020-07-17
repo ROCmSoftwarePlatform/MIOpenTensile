@@ -7,7 +7,7 @@ project(miopentensile LANGUAGES CXX)
 
 add_definitions(-std=c++14)
 
-list(APPEND CMAKE_PREFIX_PATH /opt/rocm/hcc /opt/rocm/hip /opt/rocm)
+list(APPEND CMAKE_PREFIX_PATH /opt/rocm/hcc /opt/rocm/hip /opt/rocm/llvm /opt/rocm)
 
 find_package( ROCM CONFIG QUIET PATHS /opt/rocm )
 include(ROCMInstallTargets)
