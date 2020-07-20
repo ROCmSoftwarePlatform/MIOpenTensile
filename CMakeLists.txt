@@ -7,7 +7,19 @@ project(miopentensile LANGUAGES CXX)
 
 add_definitions(-std=c++14)
 
-list(APPEND CMAKE_PREFIX_PATH /opt/rocm/hcc /opt/rocm/hip /opt/rocm/llvm /opt/rocm)
+list(APPEND CMAKE_PREFIX_PATH /opt/rocm/hcc /opt/rocm/hip /opt/rocm)
+
+execute_process (
+    COMMAND bash -c "awk -F= '/^ID=/{print $2}' /etc/os-release |tr -d '\n' | tr -d '\"'"
+    OUTPUT_VARIABLE outOS
+)
+if(outOS MATCHES "centos")
+    if(EXISTS "/usr/lib64/llvm7.0")
+        list(APPEND CMAKE_PREFIX_PATH /usr/lib64/llvm7.0)
+    else()
+        list(APPEND CMAKE_PREFIX_PATH /opt/rh/llvm-toolset-7/root/usr)
+    endif()
+endif()
 
 find_package( ROCM CONFIG QUIET PATHS /opt/rocm )
 include(ROCMInstallTargets)
