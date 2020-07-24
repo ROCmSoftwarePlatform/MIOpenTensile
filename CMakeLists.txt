@@ -90,11 +90,18 @@ TensileCreateLibraryFiles(
     COMPILER ${COMPILER}
     CODE_OBJECT_VERSION ${CODE_OBJECT_VERSION}
     Tensile_LIBRARY_FORMAT  yaml
-    TENSILE_USE_LLVM ON
+    VAR_PREFIX MIOPENTENSILE
+    SHORT_FILE_NAMES
     )
 
+TensileCreateCopyTarget(
+    copy_kernels_miopentensile
+    "${MIOPENTENSILE_ALL_FILES}"
+    "${CMAKE_CURRENT_BINARY_DIR}/lib/miopentensile"
+    )
 
 add_library(MIOpenTensile SHARED src/gemm_api.cpp)
+add_dependencies(MIOpenTensile copy_kernels_miopentensile)
 target_link_libraries(MIOpenTensile PUBLIC hip::host)
 target_link_libraries(MIOpenTensile PRIVATE TensileHost)
 target_compile_definitions(MIOpenTensile PRIVATE __HIP_PLATFORM_HCC__)
