@@ -9,6 +9,18 @@ add_definitions(-std=c++14)
 
 list(APPEND CMAKE_PREFIX_PATH /opt/rocm/hcc /opt/rocm/hip /opt/rocm)
 
+execute_process (
+    COMMAND bash -c "awk -F= '/^ID=/{print $2}' /etc/os-release |tr -d '\n' | tr -d '\"'"
+    OUTPUT_VARIABLE outOS
+)
+if(outOS MATCHES "centos")
+    if(EXISTS "/usr/lib64/llvm7.0")
+        list(APPEND CMAKE_PREFIX_PATH /usr/lib64/llvm7.0)
+    else()
+        list(APPEND CMAKE_PREFIX_PATH /opt/rh/llvm-toolset-7/root/usr)
+    endif()
+endif()
+
 find_package( ROCM CONFIG QUIET PATHS /opt/rocm )
 include(ROCMInstallTargets)
 include(ROCMSetupVersion)
@@ -50,7 +62,7 @@ if(BUILD_DEV)
     set(MIOPEN_TENSILE_SRC dev)
 endif()
 # Use the virtual-env setup and download package from specified repo:
-set( MIOPEN_TENSILE_TAG 698e3174c4d6e5045e9a619158cd075273ccef96 CACHE STRING "Tensile tag to download" )
+set( MIOPEN_TENSILE_TAG baed862380bf99580972f0eed51a4aab7234c2da CACHE STRING "Tensile tag to download" )
 virtualenv_install(wheel)
 virtualenv_install("git+https://github.com/ROCmSoftwarePlatform/Tensile.git@${MIOPEN_TENSILE_TAG}")
 list(APPEND CMAKE_PREFIX_PATH ${VIRTUALENV_HOME_DIR})
@@ -58,22 +70,37 @@ list(APPEND CMAKE_PREFIX_PATH ${VIRTUALENV_HOME_DIR})
 find_package(Tensile REQUIRED COMPONENTS HIP LLVM)
 
 # Workaround broke tensile cmake
+if(CMAKE_CXX_COMPILER MATCHES ".*/hcc$")
+    set(COMPILER "hcc")
+    set(CODE_OBJECT_VERSION "V2")
+else()
+    set(COMPILER "hipcc")
+    set(CODE_OBJECT_VERSION "V3")
+endif()
+
+set_target_properties( TensileHost PROPERTIES POSITION_INDEPENDENT_CODE ON )
+
 get_filename_component(COMPILER_PATH ${CMAKE_CXX_COMPILER} DIRECTORY)
 set(ENV{PATH} "${hip_BIN_INSTALL_DIR}:${COMPILER_PATH}:$ENV{PATH}")
 TensileCreateLibraryFiles(
     "${CMAKE_CURRENT_SOURCE_DIR}/yaml/${MIOPEN_TENSILE_SRC}"
     "${CMAKE_CURRENT_BINARY_DIR}/lib/miopentensile"
     ARCHITECTURE ${Tensile_ARCHITECTURE}
-    VAR_PREFIX MIOPEN_TENSILE
-    NO_MERGE_FILES
+    MERGE_FILES ON
+    COMPILER ${COMPILER}
+    CODE_OBJECT_VERSION ${CODE_OBJECT_VERSION}
+    LIBRARY_FORMAT yaml
+    VAR_PREFIX MIOPENTENSILE
     )
 
-include(embed)
-
-file(GLOB CODE_OBJECTS "${CMAKE_CURRENT_BINARY_DIR}/lib/miopentensile/library/*co")
-add_embed_library(miopentensile_data ${CODE_OBJECTS})
+TensileCreateCopyTarget(
+    copy_kernels_miopentensile
+    "${MIOPENTENSILE_ALL_FILES}"
+    "${CMAKE_CURRENT_BINARY_DIR}/lib/miopentensile"
+    )
 
 add_library(MIOpenTensile SHARED src/gemm_api.cpp)
+add_dependencies(MIOpenTensile copy_kernels_miopentensile)
 target_link_libraries(MIOpenTensile PUBLIC hip::host)
 target_link_libraries(MIOpenTensile PRIVATE TensileHost miopentensile_data)
 target_compile_definitions(MIOpenTensile PRIVATE __HIP_PLATFORM_HCC__)
