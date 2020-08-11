@@ -62,7 +62,7 @@ if(BUILD_DEV)
     set(MIOPEN_TENSILE_SRC dev)
 endif()
 # Use the virtual-env setup and download package from specified repo:
-set( MIOPEN_TENSILE_TAG 3033d64d85fc6ccddf01be87698278ed28b2dbe9 CACHE STRING "Tensile tag to download" )
+set( MIOPEN_TENSILE_TAG baed862380bf99580972f0eed51a4aab7234c2da CACHE STRING "Tensile tag to download" )
 virtualenv_install(wheel)
 virtualenv_install("git+https://github.com/ROCmSoftwarePlatform/Tensile.git@${MIOPEN_TENSILE_TAG}")
 list(APPEND CMAKE_PREFIX_PATH ${VIRTUALENV_HOME_DIR})
