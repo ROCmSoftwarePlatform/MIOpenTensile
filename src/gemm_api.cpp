@@ -82,7 +82,7 @@ auto& adaptor()
 
 bool is_transposed(const miopen_tensile_matrix& a)
 {
-    return a.strides[1] > a.strides[0];
+    return a.is_mat_transposed;
 }
 
 size_t get_idx(const miopen_tensile_matrix& a, size_t n)
@@ -102,7 +102,7 @@ Tensile::DataType get_data_type(const miopen_tensile_matrix&)
 
 miopen_tensile_matrix transpose(const miopen_tensile_matrix& a)
 {
-    return miopen_tensile_matrix{{a.lens[1], a.lens[0]}, {a.strides[1], a.strides[0]}};
+    return miopen_tensile_matrix{{a.lens[1], a.lens[0]}, {a.strides[1], a.strides[0]}, a.batch, a.type, !a.is_mat_transposed, a.data};
 }
 
 Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& a, const miopen_tensile_matrix& b, const miopen_tensile_matrix& c)

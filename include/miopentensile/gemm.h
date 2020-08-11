@@ -35,6 +35,7 @@ typedef struct
     miopen_tensile_2d strides;
     miopen_tensile_batch batch;
     miopen_tensile_type type;
+    bool is_mat_transposed;
     void* data;
 } miopen_tensile_matrix;
 
