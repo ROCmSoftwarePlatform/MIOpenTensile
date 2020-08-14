@@ -6,6 +6,7 @@
 #include <Tensile/hip/HipSolutionAdapter.hpp>
 #include <dlfcn.h>
 #include <glob.h>
+#include <miopentensile_data.hpp>
 
 #define MIOT_DEBUG_PRINTOUTS 1
 
@@ -66,12 +67,8 @@ const auto& library()
 auto create_adaptor() {
     // Workaround: The Tensile::hip::SolutionAdapter is not a regular type, so heap allocate it instead
     auto a = std::make_shared<Tensile::hip::SolutionAdapter>();
-    auto dir = library_path() + "*co";
-    glob_t glob_result{};
-    int g = glob(dir.c_str(), GLOB_NOSORT, nullptr, &glob_result);
-    for(size_t i = 0; i < glob_result.gl_pathc; ++i)
-        a->loadCodeObjectFile(glob_result.gl_pathv[i]);
-    globfree(&glob_result);
+    for(auto&& p:miopentensile_data())
+        a->loadCodeObject(p.second.first);
     return a;
 }
 

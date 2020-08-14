@@ -102,7 +102,7 @@ TensileCreateCopyTarget(
 add_library(MIOpenTensile SHARED src/gemm_api.cpp)
 add_dependencies(MIOpenTensile copy_kernels_miopentensile)
 target_link_libraries(MIOpenTensile PUBLIC hip::host)
-target_link_libraries(MIOpenTensile PRIVATE TensileHost)
+target_link_libraries(MIOpenTensile PRIVATE TensileHost miopentensile_data)
 target_compile_definitions(MIOpenTensile PRIVATE __HIP_PLATFORM_HCC__)
 
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/lib/miopentensile/library/TensileLibrary.yaml" DESTINATION lib/miopentensile/library)
