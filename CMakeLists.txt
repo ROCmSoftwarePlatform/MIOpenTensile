@@ -73,9 +73,11 @@ find_package(Tensile REQUIRED COMPONENTS HIP LLVM)
 if(CMAKE_CXX_COMPILER MATCHES ".*/hcc$")
     set(COMPILER "hcc")
     set(CODE_OBJECT_VERSION "V2")
+    set(TENSILE_LIBRARY_FORMAT "yaml")
 else()
     set(COMPILER "hipcc")
     set(CODE_OBJECT_VERSION "V3")
+    set(TENSILE_LIBRARY_FORMAT "msgpack")
 endif()
 
 set_target_properties( TensileHost PROPERTIES POSITION_INDEPENDENT_CODE ON )
@@ -89,7 +91,7 @@ TensileCreateLibraryFiles(
     MERGE_FILES ON
     COMPILER ${COMPILER}
     CODE_OBJECT_VERSION ${CODE_OBJECT_VERSION}
-    LIBRARY_FORMAT yaml
+    LIBRARY_FORMAT ${TENSILE_LIBRARY_FORMAT}
     VAR_PREFIX MIOPENTENSILE
     )
 
