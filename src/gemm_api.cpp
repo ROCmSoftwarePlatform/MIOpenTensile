@@ -52,7 +52,13 @@ std::string library_path()
 
 auto create_library()
 {
-    return Tensile::LoadLibraryFile<Tensile::ContractionProblem>(library_path() + "TensileLibrary.yaml");
+    return Tensile::LoadLibraryFile<Tensile::ContractionProblem>(library_path() +
+#if TENSILE_USE_LLVM && !TENSILE_USE_MSGPACK
+        "TensileLibrary.yaml"
+#else
+        "TensileLibrary.dat"
+#endif
+        );
     // return Tensile::EmbeddedLibrary<Tensile::ContractionProblem>::NewLibrary("miopen_tensile_kernels");
 }
 

@@ -56,6 +56,20 @@ macro(add_library NAME)
 endmacro()
 find_package(hip)
 
+if(CMAKE_CXX_COMPILER MATCHES ".*/hcc$")
+    set(TENSILE_USE_LLVM ON CACHE BOOL "Use LLVM for parsing config files.")
+    set(TENSILE_USE_MSGPACK OFF CACHE BOOL "Use msgpack for parsing config files.")
+    set(COMPILER "hcc")
+    set(CODE_OBJECT_VERSION "V2")
+    set(TENSILE_LIBRARY_FORMAT "yaml")
+else()
+    set(TENSILE_USE_LLVM OFF CACHE BOOL "Use LLVM for parsing config files.")
+    set(TENSILE_USE_MSGPACK ON CACHE BOOL "Use msgpack for parsing config files.")
+    set(COMPILER "hipcc")
+    set(CODE_OBJECT_VERSION "V3")
+    set(TENSILE_LIBRARY_FORMAT "msgpack")
+endif()
+
 option(BUILD_DEV "Build for development" OFF)
 set(MIOPEN_TENSILE_SRC asm_full)
 if(BUILD_DEV)
@@ -68,17 +82,6 @@ virtualenv_install("git+https://github.com/ROCmSoftwarePlatform/Tensile.git@${MI
 list(APPEND CMAKE_PREFIX_PATH ${VIRTUALENV_HOME_DIR})
 
 find_package(Tensile REQUIRED COMPONENTS HIP LLVM)
-
-# Workaround broke tensile cmake
-if(CMAKE_CXX_COMPILER MATCHES ".*/hcc$")
-    set(COMPILER "hcc")
-    set(CODE_OBJECT_VERSION "V2")
-    set(TENSILE_LIBRARY_FORMAT "yaml")
-else()
-    set(COMPILER "hipcc")
-    set(CODE_OBJECT_VERSION "V3")
-    set(TENSILE_LIBRARY_FORMAT "msgpack")
-endif()
 
 set_target_properties( TensileHost PROPERTIES POSITION_INDEPENDENT_CODE ON )
 
