@@ -7,7 +7,7 @@ project(miopentensile LANGUAGES CXX)
 
 add_definitions(-std=c++14)
 
-list(APPEND CMAKE_PREFIX_PATH /opt/rocm/hcc /opt/rocm/hip /opt/rocm)
+list(APPEND CMAKE_PREFIX_PATH /opt/rocm/hcc /opt/rocm/hip /opt/rocm/llvm /opt/rocm)
 
 execute_process (
     COMMAND bash -c "awk -F= '/^ID=/{print $2}' /etc/os-release |tr -d '\n' | tr -d '\"'"
@@ -65,23 +65,23 @@ if(CMAKE_CXX_COMPILER MATCHES ".*/hcc$")
 else()
     set(TENSILE_USE_LLVM OFF CACHE BOOL "Use LLVM for parsing config files.")
     set(TENSILE_USE_MSGPACK ON CACHE BOOL "Use msgpack for parsing config files.")
-    set(COMPILER "hipcc")
+    set(COMPILER "clang++")
     set(CODE_OBJECT_VERSION "V3")
     set(TENSILE_LIBRARY_FORMAT "msgpack")
 endif()
 
-option(BUILD_DEV "Build for development" OFF)
+# option(BUILD_DEV "Build for development" OFF)
 set(MIOPEN_TENSILE_SRC asm_full)
-if(BUILD_DEV)
-    set(MIOPEN_TENSILE_SRC dev)
-endif()
+# if(BUILD_DEV)
+#     set(MIOPEN_TENSILE_SRC dev)
+# endif()
 # Use the virtual-env setup and download package from specified repo:
 set( MIOPEN_TENSILE_TAG baed862380bf99580972f0eed51a4aab7234c2da CACHE STRING "Tensile tag to download" )
 virtualenv_install(wheel)
 virtualenv_install("git+https://github.com/ROCmSoftwarePlatform/Tensile.git@${MIOPEN_TENSILE_TAG}")
 list(APPEND CMAKE_PREFIX_PATH ${VIRTUALENV_HOME_DIR})
 
-find_package(Tensile REQUIRED COMPONENTS HIP LLVM)
+find_package(Tensile REQUIRED COMPONENTS HIP)
 
 set_target_properties( TensileHost PROPERTIES POSITION_INDEPENDENT_CODE ON )
 
