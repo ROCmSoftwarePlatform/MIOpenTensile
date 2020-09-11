@@ -159,7 +159,7 @@ Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& 
                                                                  c.batch.stride,
                                                                  1.0);
 
-        if (a.type == miopen_tensile_type_bfloat16 || a.type == miopen_tensile_type_int8x4)
+        if (a.type == miopen_tensile_type_half || a.type == miopen_tensile_type_bfloat16 || a.type == miopen_tensile_type_int8x4)
             problem.setHighPrecisionAccumulate(true);
 
         return problem;
