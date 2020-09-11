@@ -6,7 +6,8 @@
 #include <Tensile/hip/HipSolutionAdapter.hpp>
 #include <dlfcn.h>
 #include <glob.h>
-#include <miopentensile_data.hpp>
+
+#define MIOT_DEBUG_PRINTOUTS 0
 
 std::vector<std::string> glob_files(const std::string& s)
 {
@@ -51,7 +52,13 @@ std::string library_path()
 
 auto create_library()
 {
-    return Tensile::LoadLibraryFile<Tensile::ContractionProblem>(library_path() + "TensileLibrary.yaml");
+    return Tensile::LoadLibraryFile<Tensile::ContractionProblem>(library_path() +
+#if TENSILE_USE_LLVM && !TENSILE_USE_MSGPACK
+        "TensileLibrary.yaml"
+#else
+        "TensileLibrary.dat"
+#endif
+        );
     // return Tensile::EmbeddedLibrary<Tensile::ContractionProblem>::NewLibrary("miopen_tensile_kernels");
 }
 
@@ -65,8 +72,8 @@ const auto& library()
 auto create_adaptor() {
     // Workaround: The Tensile::hip::SolutionAdapter is not a regular type, so heap allocate it instead
     auto a = std::make_shared<Tensile::hip::SolutionAdapter>();
-    for(auto&& p:miopentensile_data())
-        a->loadCodeObject(p.second.first);
+    for(auto&& f:glob_files(library_path() + "*co"))
+        a->loadCodeObjectFile(f);
     return a;
 }
 
@@ -79,7 +86,7 @@ auto& adaptor()
 
 bool is_transposed(const miopen_tensile_matrix& a)
 {
-    return a.strides[1] > a.strides[0];
+    return a.is_mat_transposed;
 }
 
 size_t get_idx(const miopen_tensile_matrix& a, size_t n)
@@ -106,7 +113,7 @@ Tensile::DataType get_data_type(const miopen_tensile_matrix& a)
 
 miopen_tensile_matrix transpose(const miopen_tensile_matrix& a)
 {
-    return miopen_tensile_matrix{{a.lens[1], a.lens[0]}, {a.strides[1], a.strides[0]}};
+    return miopen_tensile_matrix{{a.lens[1], a.lens[0]}, {a.strides[1], a.strides[0]}, a.batch, a.type, !a.is_mat_transposed, a.data};
 }
 
 Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& a, const miopen_tensile_matrix& b, const miopen_tensile_matrix& c)
@@ -114,6 +121,24 @@ Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& 
     if (a.batch.num > 1 or b.batch.num > 1 or c.batch.num > 1 or a.type != miopen_tensile_type_float or b.type != miopen_tensile_type_float or c.type != miopen_tensile_type_float)
     {
         auto batch = std::max({a.batch.num, b.batch.num, c.batch.num});
+
+#if MIOT_DEBUG_PRINTOUTS
+        printf("tensile gemm_strides\n");
+        printf("is_transposed(a)  %d\n", int(is_transposed(a)));
+        printf("is_transposed(b)  %d\n", int(is_transposed(b)));
+        printf("a.lens[0]  %zu\n", a.lens[0]);
+        printf("a.lens[1]  %zu\n", a.lens[1]);
+        printf("b.lens[0]  %zu\n", b.lens[0]);
+        printf("b.lens[1]  %zu\n", b.lens[1]);
+        printf("batch  %zu\n", batch);
+        printf("get_ld(a)  %zu\n", get_ld(a));
+        printf("a.batch.stride  %zu\n", a.batch.stride);
+        printf("get_ld(b)  %zu\n", get_ld(b));
+        printf("b.batch.stride  %zu\n", b.batch.stride);
+        printf("get_ld(c)  %zu\n", get_ld(c));
+        printf("c.batch.stride  %zu\n", c.batch.stride);
+#endif
+
         auto problem = Tensile::ContractionProblem::GEMM_Strides(is_transposed(a), 
                                                                  is_transposed(b), 
                                                                  get_data_type(a), 
@@ -136,10 +161,27 @@ Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& 
 
         if (a.type == miopen_tensile_type_bfloat16 || a.type == miopen_tensile_type_int8x4)
             problem.setHighPrecisionAccumulate(true);
-            
+
         return problem;
     }
     else
+    {
+#if MIOT_DEBUG_PRINTOUTS
+        printf("tensile gemm\n");
+        printf("is_transposed(a)  %d\n", int(is_transposed(a)));
+        printf("is_transposed(b)  %d\n", int(is_transposed(b)));
+        printf("a.lens[0]  %zu\n", a.lens[0]);
+        printf("a.lens[1]  %zu\n", a.lens[1]);
+        printf("b.lens[0]  %zu\n", b.lens[0]);
+        printf("b.lens[1]  %zu\n", b.lens[1]);
+        printf("get_ld(a)  %zu\n", get_ld(a));
+        printf("a.batch.stride  %zu\n", a.batch.stride);
+        printf("get_ld(b)  %zu\n", get_ld(b));
+        printf("b.batch.stride  %zu\n", b.batch.stride);
+        printf("get_ld(c)  %zu\n", get_ld(c));
+        printf("c.batch.stride  %zu\n", c.batch.stride);
+#endif
+
         return Tensile::ContractionProblem::GEMM(is_transposed(a),
                                                  is_transposed(b), 
                                                  is_transposed(a) ? a.lens[0] : a.lens[1], 
@@ -151,6 +193,7 @@ Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& 
                                                  1.0, 
                                                  false, 
                                                  1);
+    }
 }
 
 template <typename A, typename B = A, typename C = A, typename D = C, typename Alpha = C, typename Beta = C>
