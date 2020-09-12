@@ -18,7 +18,11 @@ typedef enum {
 } miopen_tensile_status;
 
 typedef enum {
-    miopen_tensile_type_float = 0
+    miopen_tensile_type_float = 0,
+    miopen_tensile_type_half = 1,
+    miopen_tensile_type_bfloat16 = 2,
+    miopen_tensile_type_int8x4 = 3,
+    miopen_tensile_type_int32 = 4,
 } miopen_tensile_type;
 
 typedef size_t miopen_tensile_2d[2];
