@@ -31,12 +31,13 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/bin)
 
-set( AMDGPU_TARGETS "gfx803;gfx900;gfx906" CACHE STRING "List of specific machine types for library to target" )
+set( MIOTENSILE_GPU_TARGETS "gfx803;gfx900;gfx906" CACHE STRING "List of specific machine types for library to target" )
+set_property( CACHE MIOTENSILE_GPU_TARGETS PROPERTY STRINGS all gfx000 gfx803 gfx900 gfx906 gfx908)
 
-if(AMDGPU_TARGETS MATCHES ";")
+if(MIOTENSILE_GPU_TARGETS MATCHES ";")
     set(Tensile_ARCHITECTURE "all")
 else()
-    set(Tensile_ARCHITECTURE ${AMDGPU_TARGETS})
+    set(Tensile_ARCHITECTURE ${MIOTENSILE_GPU_TARGETS})
 endif()
 
 # Dont build as shared as a workaround
