@@ -7,7 +7,7 @@
 #include <dlfcn.h>
 #include <glob.h>
 
-#define MIOT_DEBUG_PRINTOUTS 0
+#define MIOT_DEBUG_PRINTOUTS 1
 
 std::vector<std::string> glob_files(const std::string& s)
 {
@@ -123,6 +123,7 @@ Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& 
         auto batch = std::max({a.batch.num, b.batch.num, c.batch.num});
 
 #if MIOT_DEBUG_PRINTOUTS
+	printf("\n");
         printf("tensile gemm_strides\n");
         printf("is_transposed(a)  %d\n", int(is_transposed(a)));
         printf("is_transposed(b)  %d\n", int(is_transposed(b)));
@@ -137,6 +138,10 @@ Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& 
         printf("b.batch.stride  %zu\n", b.batch.stride);
         printf("get_ld(c)  %zu\n", get_ld(c));
         printf("c.batch.stride  %zu\n", c.batch.stride);
+        printf("\n"); 
+	printf("c.lens[0]  %zu\n", c.lens[0]);
+        printf("c.lens[1]  %zu\n", c.lens[1]);
+        printf("\n");
 #endif
 
         auto problem = Tensile::ContractionProblem::GEMM_Strides(is_transposed(a), 
@@ -167,6 +172,7 @@ Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& 
     else
     {
 #if MIOT_DEBUG_PRINTOUTS
+        printf("\n");
         printf("tensile gemm\n");
         printf("is_transposed(a)  %d\n", int(is_transposed(a)));
         printf("is_transposed(b)  %d\n", int(is_transposed(b)));
@@ -180,6 +186,10 @@ Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& 
         printf("b.batch.stride  %zu\n", b.batch.stride);
         printf("get_ld(c)  %zu\n", get_ld(c));
         printf("c.batch.stride  %zu\n", c.batch.stride);
+        printf("\n");
+        printf("c.lens[0]  %zu\n", c.lens[0]);
+        printf("c.lens[1]  %zu\n", c.lens[1]);
+        printf("\n");
 #endif
 
         return Tensile::ContractionProblem::GEMM(is_transposed(a),

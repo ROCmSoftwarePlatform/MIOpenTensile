@@ -43,14 +43,16 @@ std::vector<T> generate(std::size_t sz, T start)
 }
 
 template<class T>
-std::vector<T> rand_generate(std::size_t sz, T scale = 1, int seed = 0)
+std::vector<T> rand_generate(std::size_t sz, T scale = 1, long long seed = 0)
 {
     std::vector<T> result(sz);
     srand(seed);
     for(auto itr = result.begin(); itr < result.end() ; itr++ )
-        *itr = static_cast<T>(double(scale)*(rand() / static_cast<double>(RAND_MAX)));
-    for(auto i : result)
-        printf("rand_gene  %f\n", float(i));
+        *itr = static_cast<T>(int(double(scale)*(rand() / static_cast<double>(RAND_MAX))));
+//    printf("\n");
+//    for(auto i : result)
+//        printf("rand_gene  %f\n", float(i));
+//    printf("\n");
     return result;
 }
 
@@ -228,6 +230,8 @@ std::vector<T> cpu_gemm(miopen_tensile_matrix as, miopen_tensile_matrix bs, miop
             c[idx] += x;
 	}
     }
+//    for(auto i : c)
+//        printf("cpu c mat : %f\n", float(i));
     return c;
 }
 
@@ -262,8 +266,8 @@ std::vector<T> gpu_gemm(miopen_tensile_matrix as, miopen_tensile_matrix bs, miop
     if (e != miopen_tensile_status_success)
         throw std::runtime_error("Failed to run miopen_tensile_gemm_hip");
     auto r = from_gpu<T>(cs.data, get_mat_size(cs));
-    for(auto i : r)
-	printf("gpu c : %f\n", float(i));
+//    for(auto i : r)
+//        printf("gpu c mat : %f\n", float(i));
     return r;
 }
 
@@ -274,8 +278,8 @@ void verify_gemm(miopen_tensile_matrix as, miopen_tensile_matrix bs, miopen_tens
     std::cout << "b -> " << bs.lens[0] << " " << bs.lens[1] << std::endl;
     std::cout << "c -> " << cs.lens[0] << " " << cs.lens[1] << std::endl;
 
-    auto va = rand_generate<T>(get_mat_size(as), T(1), 0);
-    auto vb = rand_generate<T>(get_mat_size(bs), T(1), 1);
+    auto va = rand_generate<T>(get_mat_size(as), T(32), 0);
+    auto vb = rand_generate<T>(get_mat_size(bs), T(32), 0xFF);
     auto vc = fill<T>(get_mat_size(cs), T(0));
 
     auto cpu = cpu_gemm<T>(as, bs, cs, va, vb, vc);
@@ -290,7 +294,7 @@ std::size_t get_stride(std::vector<std::size_t> l, int idx, bool transposed = fa
 
 std::size_t get_batch_stride(std::vector<std::size_t> l)
 {
-    return l.size() == 3 ? std::accumulate(l.rbegin(), l.rbegin() + 1, std::size_t{1}, std::multiplies<std::size_t>()) : 0;
+    	return l.size() == 3 ? std::accumulate(l.rbegin().base() - 2, l.rbegin().base(), std::size_t{1}, std::multiplies<std::size_t>()) : 0;
 }
 
 miopen_tensile_matrix init_mat(std::vector<std::size_t> l, bool transposed = false, miopen_tensile_type dtype = miopen_tensile_type_float)
@@ -301,6 +305,12 @@ miopen_tensile_matrix init_mat(std::vector<std::size_t> l, bool transposed = fal
                               dtype,
                               transposed,
                               nullptr};
+
+    printf("mat lens               :  %f   %f\n", float(s.lens[0]), float(s.lens[1]));
+    printf("mat strides            :  %f   %f\n", float(s.strides[0]), float(s.strides[1]));
+    printf("mat batch size, stride :  %f   %f\n", float(s.batch.num), float(s.batch.stride));
+    printf("mat transpose          :  %d\n", int(s.is_mat_transposed));
+
     return s;
 }
 
@@ -326,23 +336,34 @@ TEST_CASE(gemm3)
 TEST_CASE(gemm4)
 {
     verify_gemm<float>(init_mat({8, 4}),
-                       init_mat({4, 32}), 
+                       init_mat({32, 4}, true), 
                        init_mat({8, 32}));
 }
 TEST_CASE(gemm5)
 {
-    verify_gemm<float>(init_mat({64, 64}),
-                       init_mat({64, 64}), 
-                       init_mat({64, 64}));
+    verify_gemm<float>(init_mat({1024, 1024}),
+                       init_mat({1024, 1024}), 
+                       init_mat({1024, 1024}));
 }
+TEST_CASE(gemm6)
+{
+    verify_gemm<float>(init_mat({1024, 2048},true),
+                       init_mat({2048, 1024},true),
+                       init_mat({2048, 2048}));
+}
+
 TEST_CASE(bgemm1)
 {
     verify_gemm<float>(init_mat({2, 2, 2}),
                        init_mat({2, 2, 2}), 
                        init_mat({2, 2, 2}));
 }
-
-
+TEST_CASE(bgemm2)
+{
+    verify_gemm<float>(init_mat({64, 8, 4}),
+                       init_mat({64, 4, 32}),
+                       init_mat({64, 8, 32}));
+}
 } // namespace mitensile
 
 int main(int argc, const char* argv[]) { test::run(argc, argv); }
