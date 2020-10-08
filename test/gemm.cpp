@@ -364,6 +364,12 @@ TEST_CASE(bgemm2)
                        init_mat({64, 4, 32}),
                        init_mat({64, 8, 32}));
 }
+TEST_CASE(bgemm3)
+{
+    verify_gemm<float>(init_mat({64, 4, 8}, true),
+                       init_mat({64, 32, 4}, true),
+                       init_mat({64, 8, 32}));
+}
 } // namespace mitensile
 
 int main(int argc, const char* argv[]) { test::run(argc, argv); }
