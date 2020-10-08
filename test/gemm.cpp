@@ -223,8 +223,8 @@ std::vector<T> cpu_gemm(miopen_tensile_matrix as, miopen_tensile_matrix bs, miop
 	{
             double x = 0.0;
             dfor(k)([&](int kk) {
-                int idx_a = cmi * as.strides[0] + kk * as.strides[1];
-		int idx_b = kk * bs.strides[0] + cni * bs.strides[1];
+                int idx_a = cbi * as.strides[0] * as.strides[1] * as.lens[0] + cmi * as.strides[0] + kk * as.strides[1];
+		int idx_b = cbi * bs.strides[0] * bs.strides[1] * bs.lens[0] + kk * bs.strides[0] + cni * bs.strides[1];
                 x += va[idx_a] * vb[idx_b]; 
             });
             c[idx] += x;
@@ -248,7 +248,7 @@ miopen_tensile_matrix to_tensile_matrix(shape s, const Ptr& p)
 
 std::size_t get_mat_size(miopen_tensile_matrix mat)
 {
-    return mat.strides[0] * mat.strides[1] * mat.lens[0];
+    return mat.strides[0] * mat.strides[1] * mat.lens[0] * std::max(mat.batch.num, std::size_t(1));
 }
 
 template<class T>
