@@ -30,7 +30,6 @@ def buildJob(config_targets="check"){
 
 pipeline {
     agent{
-        label rocmnode("vega20")
         docker {
             image 'miopentensile'
             args '-v /var/jenkins/:/var/jenkins'
@@ -38,9 +37,11 @@ pipeline {
     }
     stages{
         stage("Test"){
+            agent{ label rocmnode("vega20") }
             steps{ buildJob("check") }
         }
         stage("Packaging") {
+            agent{ label rocmnode("vega20") }
             steps{ buildJob("package")}
         }
     }
