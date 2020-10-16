@@ -19,7 +19,7 @@ def rocmnode(name) {
 def buildJob(config_targets="check"){
     retimage = docker.build("miopentensile")
     def cmd = ""
-    if(config_targets="package")
+    if(config_targets == "package")
         cmd = """
             rm -rf build
             export HIPCC_LINK_FLAGS_APPEND='-O3 -parallel-jobs=4'
