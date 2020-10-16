@@ -17,24 +17,23 @@ def rocmnode(name) {
 }
 
 def buildJob(config_targets="check"){
-    def cmd = """
-        rm -rf build
-        mkdir build
-        cd build
-        CXX=/opt/rocm/hip/bin/hipcc cmake .. 
-        make -j\$(nproc) ${config_targets}
-    """
-    echo cmd
-    sh cmd
+    retimage = docker.build("miopentensile")
+    withDockerContainer(image: "miopentensile") {
+        def cmd = """
+            rm -rf build
+            mkdir build
+            cd build
+            CXX=/opt/rocm/hip/bin/hipcc cmake .. 
+            make -j\$(nproc) ${config_targets}
+        """
+        echo cmd
+        sh cmd
+    }
+    return retimage
 }
 
 pipeline {
-    agent{
-        docker {
-            image 'miopentensile'
-            args '-v /var/jenkins/:/var/jenkins'
-        }
-    }
+    agent none
     stages{
         stage("Test"){
             agent{ label rocmnode("vega20") }
