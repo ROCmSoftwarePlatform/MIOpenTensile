@@ -45,9 +45,9 @@ def buildJob(config_targets="check"){
 pipeline{
     agent none
     stages{
-        stage{
+        stage("Test"){
             parallel{
-                stage("Test"){
+                stage("Logic"){
                     agent{ label rocmnode("vega20") }
                     steps{ buildJob("check") }
                 }
