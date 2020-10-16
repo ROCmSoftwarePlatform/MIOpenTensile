@@ -18,30 +18,44 @@ def rocmnode(name) {
 
 def buildJob(config_targets="check"){
     retimage = docker.build("miopentensile")
-    withDockerContainer(image: "miopentensile") {
-        def cmd = """
+    def cmd = ""
+    if(config_targets="package")
+        cmd = """
+            rm -rf build
+            export HIPCC_LINK_FLAGS_APPEND='-O3 -parallel-jobs=4'
+            export HIPCC_COMPILE_FLAGS_APPEND='-O3 -Wno-format-nonliteral -parallel-jobs=4'
+            rbuild package -d deps --cxx /opt/rocm/hip/bin/hipcc
+        """
+    else
+        cmd = """
             rm -rf build
             mkdir build
             cd build
             CXX=/opt/rocm/hip/bin/hipcc cmake .. 
-            make -j\$(nproc) ${config_targets}
+            make -j check
         """
+
+    withDockerContainer(image: "miopentensile"){
         echo cmd
         sh cmd
     }
     return retimage
 }
 
-pipeline {
+pipeline{
     agent none
     stages{
-        stage("Test"){
-            agent{ label rocmnode("vega20") }
-            steps{ buildJob("check") }
-        }
-        stage("Packaging") {
-            agent{ label rocmnode("vega20") }
-            steps{ buildJob("package")}
+        stage{
+            parallel{
+                stage("Test"){
+                    agent{ label rocmnode("vega20") }
+                    steps{ buildJob("check") }
+                }
+                stage("Packaging"){
+                    agent{ label rocmnode("vega20") }
+                    steps{ buildJob("package")}
+                }
+            }
         }
     }
 }
