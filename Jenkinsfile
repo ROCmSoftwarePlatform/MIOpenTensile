@@ -35,7 +35,7 @@ def buildJob(config_targets="check"){
             make -j check
         """
 
-    withDockerContainer(image: "miopentensile"){
+    withDockerContainer(image: "miopentensile", args: '-v=/var/jenkins/:/var/jenkins'){
         echo cmd
         sh cmd
     }
