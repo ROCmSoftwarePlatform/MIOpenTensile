@@ -7,7 +7,7 @@
 #include <dlfcn.h>
 #include <glob.h>
 
-#define MIOT_DEBUG_PRINTOUTS 1
+#define MIOT_DEBUG_PRINTOUTS 0
 
 std::vector<std::string> glob_files(const std::string& s)
 {
@@ -121,7 +121,27 @@ Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& 
     if (a.batch.num > 1 or b.batch.num > 1 or c.batch.num > 1 or a.type != miopen_tensile_type_float or b.type != miopen_tensile_type_float or c.type != miopen_tensile_type_float)
     {
         auto batch = std::max({a.batch.num, b.batch.num, c.batch.num});
-
+        auto k = is_transposed(a) ? a.lens[1] : a.lens[0];
+        auto lda = get_ld(a);
+        auto ldb = get_ld(b);
+        auto stride_a = a.batch.stride;
+        auto stride_b = b.batch.stride;
+        if(a.type == miopen_tensile_type_int8x4)
+        {
+            if(k % 4 != 0 || (is_transposed(a) && (lda % 4 != 0))|| (!is_transposed(b) && (ldb % 4 != 0))|| (c.batch.num > 1 && (a.batch.stride % 4 != 0 || b.batch.stride % 4 != 0)))
+            {
+                std::cerr << "Invalid int8 problem size." << std::endl;
+                return Tensile::ContractionProblem{};
+            }
+            else
+            {
+                k /= 4;
+                lda = !is_transposed(a) ? lda : lda / 4;
+                ldb = !is_transposed(b) ? ldb / 4 : ldb;
+                stride_a /= 4;
+                stride_b /= 4;
+            }
+        }
 #if MIOT_DEBUG_PRINTOUTS
 	printf("\n");
         printf("tensile gemm_strides\n");
@@ -152,12 +172,12 @@ Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& 
                                                                  get_data_type(c), 
                                                                  is_transposed(a) ? a.lens[0] : a.lens[1], 
                                                                  is_transposed(b) ? b.lens[1] : b.lens[0], 
-                                                                 is_transposed(a) ? a.lens[1] : a.lens[0],
-                                                                 batch, 
-                                                                 get_ld(a),
-                                                                 a.batch.stride, 
-                                                                 get_ld(b),
-                                                                 b.batch.stride, 
+                                                                 k,
+                                                                 batch,
+                                                                 lda,
+                                                                 stride_a,
+                                                                 ldb,
+                                                                 stride_b,
                                                                  get_ld(c),
                                                                  c.batch.stride,
                                                                  get_ld(c),
