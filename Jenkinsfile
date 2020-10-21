@@ -48,11 +48,11 @@ pipeline{
         stage("Test"){
             parallel{
                 stage("Logic"){
-                    agent{ label rocmnode("vega20") }
+                    agent{ label rocmnode("gfx908") }
                     steps{ buildJob("check") }
                 }
                 stage("Packaging"){
-                    agent{ label rocmnode("vega20") }
+                    agent{ label rocmnode("gfx908") }
                     steps{ buildJob("package")}
                 }
             }
