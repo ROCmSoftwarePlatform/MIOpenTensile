@@ -43,6 +43,20 @@ std::vector<T> generate(std::size_t sz, T start)
 }
 
 template<class T>
+std::vector<T> rand_generate(std::size_t sz, T scale = 1, long long seed = 0)
+{
+    std::vector<T> result(sz);
+    srand(seed);
+    for(auto itr = result.begin(); itr < result.end() ; itr++ )
+        *itr = static_cast<T>(int(double(scale)*(rand() / static_cast<double>(RAND_MAX))));
+//    printf("\n");
+//    for(auto i : result)
+//        printf("rand_gene  %f\n", float(i));
+//    printf("\n");
+    return result;
+}
+
+template<class T>
 std::vector<T> fill(std::size_t sz, T value)
 {
     std::vector<T> result(sz);
@@ -192,20 +206,32 @@ auto shape_with(const shape& s, R&& x)
 }
 
 template<class T>
-std::vector<T> cpu_gemm(shape as, shape bs, shape cs)
+std::vector<T> cpu_gemm(miopen_tensile_matrix as, miopen_tensile_matrix bs, miopen_tensile_matrix cs, std::vector<T> va, std::vector<T> vb, std::vector<T> vc)
 {
-    auto a = as.generate<T>(1);
-    auto b = bs.generate<T>(2);
-    auto c = cs.fill<T>(0);
-    auto k = as.lens.back();
-    cs.for_each([&](auto idx) {
-        double x = 0.0;
-        dfor(k)([&](int kk) { 
-            // x += a(i, kk) * b(kk, j); 
-            x += a[as.index_ik(idx, kk)] * b[bs.index_kj(idx, kk)]; 
-        });
-        c[cs.index(idx)] = x;
-    });
+    auto c = vc;
+    auto m = cs.is_mat_transposed ? cs.lens[1] : cs.lens[0];
+    auto n = cs.is_mat_transposed ? cs.lens[0] : cs.lens[1];
+    auto k = as.is_mat_transposed ? as.lens[0] : as.lens[1];
+    for(auto idx = 0; idx < vc.size(); idx++) 
+    {
+        auto cbi = idx / cs.strides[0] / cs.strides[1] / cs.lens[0];
+	auto cmi = (idx / cs.strides[0] / cs.strides[1]) % cs.lens[0];
+        auto cni = idx % (cs.strides[0] * cs.strides[1]);
+	if(cs.is_mat_transposed)
+	    std::swap(cmi, cni);
+	if(cmi < m && cni < n)
+	{
+            double x = 0.0;
+            dfor(k)([&](int kk) {
+                int idx_a = cbi * as.strides[0] * as.strides[1] * as.lens[0] + cmi * as.strides[0] + kk * as.strides[1];
+		int idx_b = cbi * bs.strides[0] * bs.strides[1] * bs.lens[0] + kk * bs.strides[0] + cni * bs.strides[1];
+                x += va[idx_a] * vb[idx_b]; 
+            });
+            c[idx] += x;
+	}
+    }
+//    for(auto i : c)
+//        printf("cpu c mat : %f\n", float(i));
     return c;
 }
 
@@ -220,83 +246,130 @@ miopen_tensile_matrix to_tensile_matrix(shape s, const Ptr& p)
         throw std::runtime_error("Invalid shape to to_tensile_matrix");
 }
 
-template<class T>
-std::vector<T> gpu_gemm(shape as, shape bs, shape cs)
+std::size_t get_mat_size(miopen_tensile_matrix mat)
 {
-    auto a = to_gpu(as.generate<T>(1));
-    auto b = to_gpu(bs.generate<T>(2));
-    auto c = to_gpu(cs.fill<T>(0));
-    auto am = to_tensile_matrix(as, a);
-    auto bm = to_tensile_matrix(bs, b);
-    auto cm = to_tensile_matrix(cs, c);
+    return mat.strides[0] * mat.strides[1] * mat.lens[0] * std::max(mat.batch.num, std::size_t(1));
+}
+
+template<class T>
+std::vector<T> gpu_gemm(miopen_tensile_matrix as, miopen_tensile_matrix bs, miopen_tensile_matrix cs, std::vector<T> va, std::vector<T> vb, std::vector<T> vc)
+{
+    auto a = to_gpu(va);
+    auto b = to_gpu(vb);
+    auto c = to_gpu(vc);
+    as.data = a.get();
+    bs.data = b.get();
+    cs.data = c.get();
 
     auto stream = create_stream();
-    auto e = miopen_tensile_gemm_hip(stream.get(), &am, &bm, &cm, 1.0, 0.0);
+    auto e = miopen_tensile_gemm_hip(stream.get(), &as, &bs, &cs, 1.0, 0.0);
     if (e != miopen_tensile_status_success)
         throw std::runtime_error("Failed to run miopen_tensile_gemm_hip");
-    auto r = from_gpu<T>(cm.data, cs.element_space());
+    auto r = from_gpu<T>(cs.data, get_mat_size(cs));
+//    for(auto i : r)
+//        printf("gpu c mat : %f\n", float(i));
     return r;
 }
 
 template<class T>
-void verify_gemm(shape as, shape bs, shape cs)
+void verify_gemm(miopen_tensile_matrix as, miopen_tensile_matrix bs, miopen_tensile_matrix cs)
 {
-    std::cout << "a -> " << as << std::endl;
-    std::cout << "b -> " << bs << std::endl;
-    std::cout << "c -> " << cs << std::endl;
-    auto cpu = cpu_gemm<T>(as, bs, cs);
-    auto gpu = gpu_gemm<T>(as, bs, cs);
+    std::cout << "a -> " << as.lens[0] << " " << as.lens[1] << std::endl;
+    std::cout << "b -> " << bs.lens[0] << " " << bs.lens[1] << std::endl;
+    std::cout << "c -> " << cs.lens[0] << " " << cs.lens[1] << std::endl;
+
+    auto va = rand_generate<T>(get_mat_size(as), T(32), 0);
+    auto vb = rand_generate<T>(get_mat_size(bs), T(32), 0xFF);
+    auto vc = fill<T>(get_mat_size(cs), T(0));
+
+    auto cpu = cpu_gemm<T>(as, bs, cs, va, vb, vc);
+    auto gpu = gpu_gemm<T>(as, bs, cs, va, vb, vc);
     EXPECT(cpu == gpu);
 }
 
-shape create_mat_shape(std::vector<std::size_t> l, bool transposed = false)
+std::size_t get_stride(std::vector<std::size_t> l, int idx, bool transposed = false)
 {
-    auto s = shape::from_lens(l);
-    if (transposed)
-        return s.transpose();
-    else
-        return s;
+    return (idx == 0 && transposed) || (idx == 1 && !transposed) ? 1 : *(l.rbegin());
+}
+
+std::size_t get_batch_stride(std::vector<std::size_t> l)
+{
+    	return l.size() == 3 ? std::accumulate(l.rbegin().base() - 2, l.rbegin().base(), std::size_t{1}, std::multiplies<std::size_t>()) : 0;
+}
+
+miopen_tensile_matrix init_mat(std::vector<std::size_t> l, bool transposed = false, miopen_tensile_type dtype = miopen_tensile_type_float)
+{
+    miopen_tensile_matrix s{{*(l.rbegin() + 1), *(l.rbegin())},
+                              {get_stride(l, 0, transposed), get_stride(l, 1, transposed)},
+                              {l.size() == 3 ? *(l.begin()) : 1, get_batch_stride(l)},
+                              dtype,
+                              transposed,
+                              nullptr};
+
+    printf("mat lens               :  %f   %f\n", float(s.lens[0]), float(s.lens[1]));
+    printf("mat strides            :  %f   %f\n", float(s.strides[0]), float(s.strides[1]));
+    printf("mat batch size, stride :  %f   %f\n", float(s.batch.num), float(s.batch.stride));
+    printf("mat transpose          :  %d\n", int(s.is_mat_transposed));
+
+    return s;
 }
 
 TEST_CASE(gemm1)
 {
-    verify_gemm<float>(create_mat_shape({2, 2}, true),
-                       create_mat_shape({2, 2}), 
-                       create_mat_shape({2, 2}));
+    verify_gemm<float>(init_mat({2, 2}, true),
+                       init_mat({2, 2}), 
+                       init_mat({2, 2}));
 }
 
 TEST_CASE(gemm2)
 {
-    verify_gemm<float>(create_mat_shape({8, 4}),
-                       create_mat_shape({4, 32}), 
-                       create_mat_shape({8, 32}));
+    verify_gemm<float>(init_mat({8, 4}),
+                       init_mat({4, 32}), 
+                       init_mat({8, 32}));
 }
 TEST_CASE(gemm3)
 {
-    verify_gemm<float>(create_mat_shape({4, 8}, true),
-                       create_mat_shape({4, 32}), 
-                       create_mat_shape({8, 32}));
+    verify_gemm<float>(init_mat({4, 8}, true),
+                       init_mat({4, 32}), 
+                       init_mat({8, 32}));
 }
 TEST_CASE(gemm4)
 {
-    verify_gemm<float>(create_mat_shape({8, 4}),
-                       create_mat_shape({4, 32}), 
-                       create_mat_shape({8, 32}));
+    verify_gemm<float>(init_mat({8, 4}),
+                       init_mat({32, 4}, true), 
+                       init_mat({8, 32}));
 }
 TEST_CASE(gemm5)
 {
-    verify_gemm<float>(create_mat_shape({64, 64}),
-                       create_mat_shape({64, 64}), 
-                       create_mat_shape({64, 64}));
+    verify_gemm<float>(init_mat({1024, 1024}),
+                       init_mat({1024, 1024}), 
+                       init_mat({1024, 1024}));
 }
+TEST_CASE(gemm6)
+{
+    verify_gemm<float>(init_mat({1024, 2048},true),
+                       init_mat({2048, 1024},true),
+                       init_mat({2048, 2048}));
+}
+
 TEST_CASE(bgemm1)
 {
-    verify_gemm<float>(create_mat_shape({2, 2, 2}),
-                       create_mat_shape({2, 2, 2}), 
-                       create_mat_shape({2, 2, 2}));
+    verify_gemm<float>(init_mat({2, 2, 2}),
+                       init_mat({2, 2, 2}), 
+                       init_mat({2, 2, 2}));
 }
-
-
+TEST_CASE(bgemm2)
+{
+    verify_gemm<float>(init_mat({64, 8, 4}),
+                       init_mat({64, 4, 32}),
+                       init_mat({64, 8, 32}));
+}
+TEST_CASE(bgemm3)
+{
+    verify_gemm<float>(init_mat({64, 4, 8}, true),
+                       init_mat({64, 32, 4}, true),
+                       init_mat({64, 8, 32}));
+}
 } // namespace mitensile
 
 int main(int argc, const char* argv[]) { test::run(argc, argv); }

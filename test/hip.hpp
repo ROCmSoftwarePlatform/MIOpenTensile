@@ -56,6 +56,7 @@ inline hip_ptr write_to_gpu(const void* x, std::size_t sz, bool host = false)
 template <class T>
 std::vector<T> from_gpu(const void* x, std::size_t sz)
 {
+    hipDeviceSynchronize();
     std::vector<T> result(sz);
     auto status = hipMemcpy(result.data(), x, sz * sizeof(T), hipMemcpyDeviceToHost);
     if(status != hipSuccess)

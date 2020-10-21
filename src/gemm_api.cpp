@@ -99,9 +99,16 @@ size_t get_ld(const miopen_tensile_matrix& a)
     return a.strides[get_idx(a, 0)];
 }
 
-Tensile::DataType get_data_type(const miopen_tensile_matrix&)
+Tensile::DataType get_data_type(const miopen_tensile_matrix& a)
 {
-    return Tensile::DataType::Float;
+    switch(a.type)
+    {
+    case miopen_tensile_type_float: return Tensile::DataType::Float;
+    case miopen_tensile_type_half: return Tensile::DataType::Half;
+    case miopen_tensile_type_int8x4: return Tensile::DataType::Int8x4;
+    case miopen_tensile_type_int32: return Tensile::DataType::Int32;
+    case miopen_tensile_type_bfloat16: return Tensile::DataType::BFloat16;
+    }
 }
 
 miopen_tensile_matrix transpose(const miopen_tensile_matrix& a)
@@ -111,11 +118,32 @@ miopen_tensile_matrix transpose(const miopen_tensile_matrix& a)
 
 Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& a, const miopen_tensile_matrix& b, const miopen_tensile_matrix& c)
 {
-    if (a.batch.num > 1 or b.batch.num > 1 or c.batch.num > 1)
+    if (a.batch.num > 1 or b.batch.num > 1 or c.batch.num > 1 or a.type != miopen_tensile_type_float or b.type != miopen_tensile_type_float or c.type != miopen_tensile_type_float)
     {
         auto batch = std::max({a.batch.num, b.batch.num, c.batch.num});
-
+        auto k = is_transposed(a) ? a.lens[1] : a.lens[0];
+        auto lda = get_ld(a);
+        auto ldb = get_ld(b);
+        auto stride_a = a.batch.stride;
+        auto stride_b = b.batch.stride;
+        if(a.type == miopen_tensile_type_int8x4)
+        {
+            if(k % 4 != 0 || (is_transposed(a) && (lda % 4 != 0))|| (!is_transposed(b) && (ldb % 4 != 0))|| (c.batch.num > 1 && (a.batch.stride % 4 != 0 || b.batch.stride % 4 != 0)))
+            {
+                std::cerr << "Invalid int8 problem size." << std::endl;
+                return Tensile::ContractionProblem{};
+            }
+            else
+            {
+                k /= 4;
+                lda = !is_transposed(a) ? lda : lda / 4;
+                ldb = !is_transposed(b) ? ldb / 4 : ldb;
+                stride_a /= 4;
+                stride_b /= 4;
+            }
+        }
 #if MIOT_DEBUG_PRINTOUTS
+	printf("\n");
         printf("tensile gemm_strides\n");
         printf("is_transposed(a)  %d\n", int(is_transposed(a)));
         printf("is_transposed(b)  %d\n", int(is_transposed(b)));
@@ -130,31 +158,41 @@ Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& 
         printf("b.batch.stride  %zu\n", b.batch.stride);
         printf("get_ld(c)  %zu\n", get_ld(c));
         printf("c.batch.stride  %zu\n", c.batch.stride);
+        printf("\n"); 
+	printf("c.lens[0]  %zu\n", c.lens[0]);
+        printf("c.lens[1]  %zu\n", c.lens[1]);
+        printf("\n");
 #endif
 
-        return Tensile::ContractionProblem::GEMM_Strides(is_transposed(a), 
-                                                         is_transposed(b), 
-                                                         get_data_type(a), 
-                                                         get_data_type(b), 
-                                                         get_data_type(c), 
-                                                         get_data_type(c), 
-                                                         is_transposed(a) ? a.lens[0] : a.lens[1], 
-                                                         is_transposed(b) ? b.lens[1] : b.lens[0], 
-                                                         is_transposed(a) ? a.lens[1] : a.lens[0],
-                                                         batch, 
-                                                         get_ld(a),
-                                                         a.batch.stride, 
-                                                         get_ld(b),
-                                                         b.batch.stride, 
-                                                         get_ld(c),
-                                                         c.batch.stride,
-                                                         get_ld(c),
-                                                         c.batch.stride,
-                                                         1.0);
+        auto problem = Tensile::ContractionProblem::GEMM_Strides(is_transposed(a), 
+                                                                 is_transposed(b), 
+                                                                 get_data_type(a), 
+                                                                 get_data_type(b), 
+                                                                 get_data_type(c), 
+                                                                 get_data_type(c), 
+                                                                 is_transposed(a) ? a.lens[0] : a.lens[1], 
+                                                                 is_transposed(b) ? b.lens[1] : b.lens[0], 
+                                                                 k,
+                                                                 batch,
+                                                                 lda,
+                                                                 stride_a,
+                                                                 ldb,
+                                                                 stride_b,
+                                                                 get_ld(c),
+                                                                 c.batch.stride,
+                                                                 get_ld(c),
+                                                                 c.batch.stride,
+                                                                 1.0);
+
+        if (a.type == miopen_tensile_type_half || a.type == miopen_tensile_type_bfloat16 || a.type == miopen_tensile_type_int8x4)
+            problem.setHighPrecisionAccumulate(true);
+
+        return problem;
     }
     else
     {
 #if MIOT_DEBUG_PRINTOUTS
+        printf("\n");
         printf("tensile gemm\n");
         printf("is_transposed(a)  %d\n", int(is_transposed(a)));
         printf("is_transposed(b)  %d\n", int(is_transposed(b)));
@@ -168,6 +206,10 @@ Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& 
         printf("b.batch.stride  %zu\n", b.batch.stride);
         printf("get_ld(c)  %zu\n", get_ld(c));
         printf("c.batch.stride  %zu\n", c.batch.stride);
+        printf("\n");
+        printf("c.lens[0]  %zu\n", c.lens[0]);
+        printf("c.lens[1]  %zu\n", c.lens[1]);
+        printf("\n");
 #endif
 
         return Tensile::ContractionProblem::GEMM(is_transposed(a),
@@ -182,6 +224,29 @@ Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& 
                                                  false, 
                                                  1);
     }
+}
+
+template <typename A, typename B = A, typename C = A, typename D = C, typename Alpha = C, typename Beta = C>
+miopen_tensile_status launch_kernels(hipStream_t& stream, 
+                                     Tensile::ContractionProblem& problem, 
+                                     std::shared_ptr<Tensile::Hardware>& hardware, 
+                                     std::shared_ptr<Tensile::ContractionProblem::Solution>& solution, 
+                                     miopen_tensile_matrix* a, 
+                                     miopen_tensile_matrix* b, 
+                                     miopen_tensile_matrix* c,
+                                     double alpha, 
+                                     double beta)
+{
+    Tensile::TypedContractionInputs<A, B, C, D, Alpha, Beta> inputs;
+    inputs.a = reinterpret_cast<const A*>(b->data);
+    inputs.b = reinterpret_cast<const B*>(a->data);
+    inputs.c = reinterpret_cast<const C*>(c->data);
+    inputs.d = reinterpret_cast<D*>(c->data);
+    inputs.alpha = Alpha(alpha);
+    inputs.beta = Beta(beta);
+    auto kernels = solution->solve(problem, inputs, *hardware);
+    adaptor().launchKernels(kernels, stream, nullptr, nullptr);
+    return miopen_tensile_status_success;
 }
 
 extern "C" {
@@ -201,16 +266,19 @@ miopen_tensile_status miopen_tensile_gemm_hip(hipStream_t stream,
         std::cerr << "No solution found." << std::endl;
         return miopen_tensile_status_no_solution;
     }
-    Tensile::TypedContractionInputs<float> inputs;
-    inputs.a = reinterpret_cast<const float*>(b->data);
-    inputs.b = reinterpret_cast<const float*>(a->data);
-    inputs.c = reinterpret_cast<const float*>(c->data);
-    inputs.d = reinterpret_cast<float*>(c->data);
-    inputs.alpha = alpha;
-    inputs.beta = beta;
-    auto kernels = solution->solve(problem, inputs, *hardware);
-    adaptor().launchKernels(kernels, stream, nullptr, nullptr);
-    return miopen_tensile_status_success;
+    switch(a->type)
+    {
+    case miopen_tensile_type_float:
+        return launch_kernels<float>(stream, problem, hardware, solution, a, b, c, alpha, beta);
+    case miopen_tensile_type_half:
+        return launch_kernels<Tensile::Half>(stream, problem, hardware, solution, a, b, c, alpha, beta);
+    case miopen_tensile_type_int8x4:
+        return launch_kernels<Tensile::Int8x4, Tensile::Int8x4, int32_t>(stream, problem, hardware, solution, a, b, c, alpha, beta);
+    case miopen_tensile_type_int32:
+        return miopen_tensile_status_no_solution;
+    case miopen_tensile_type_bfloat16:
+        return launch_kernels<Tensile::BFloat16, Tensile::BFloat16, Tensile::BFloat16, Tensile::BFloat16, float, float>(stream, problem, hardware, solution, a, b, c, alpha, beta);
+    }
 }
 
 }
