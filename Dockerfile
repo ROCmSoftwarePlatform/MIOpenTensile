@@ -51,7 +51,6 @@ RUN apt-get update --fix-missing --allow-insecure-repositories && DEBIAN_FRONTEN
     rocm-device-libs \
     rocm-opencl \
     rocm-opencl-dev \
-    rocm-cmake \
     zlib1g-dev && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
