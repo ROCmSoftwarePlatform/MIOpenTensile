@@ -51,7 +51,6 @@ RUN apt-get update --fix-missing --allow-insecure-repositories && DEBIAN_FRONTEN
     rocm-device-libs \
     rocm-opencl \
     rocm-opencl-dev \
-    rocm-cmake \
     zlib1g-dev && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
@@ -62,6 +61,9 @@ ENV LANG=C.UTF-8
 # Install cget
 RUN pip3 install wheel && pip3 install pyyaml && pip3 install cget
 RUN pip install https://github.com/pfultz2/rbuild/archive/master.tar.gz
+
+# Add symlink to /opt/rocm
+RUN [ -d /opt/rocm ] || ln -sd $(realpath /opt/rocm-*) /opt/rocm
 
 # Install rocm-cmake
 RUN cget -p $PREFIX install RadeonOpenCompute/rocm-cmake@master

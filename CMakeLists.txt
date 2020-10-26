@@ -7,7 +7,7 @@ project(miopentensile LANGUAGES CXX)
 
 add_definitions(-std=c++14)
 
-list(APPEND CMAKE_PREFIX_PATH /opt/rocm/hcc /opt/rocm/hip /opt/rocm/llvm /opt/rocm)
+list(APPEND CMAKE_PREFIX_PATH ${CMAKE_INSTALL_PREFIX}/hcc ${CMAKE_INSTALL_PREFIX}/hip ${CMAKE_INSTALL_PREFIX}/llvm ${CMAKE_INSTALL_PREFIX})
 
 execute_process (
     COMMAND bash -c "awk -F= '/^ID=/{print $2}' /etc/os-release |tr -d '\n' | tr -d '\"'"
@@ -21,7 +21,7 @@ if(outOS MATCHES "centos")
     endif()
 endif()
 
-find_package( ROCM CONFIG QUIET PATHS /opt/rocm )
+find_package( ROCM CONFIG QUIET PATHS ${CMAKE_INSTALL_PREFIX} )
 include(ROCMInstallTargets)
 include(ROCMSetupVersion)
 
@@ -71,7 +71,7 @@ else()
     set(CODE_OBJECT_VERSION "V3")
     set(TENSILE_LIBRARY_FORMAT "msgpack")
     set(MIOPEN_TENSILE_SRC asm_full)
-    set( MIOPEN_TENSILE_TAG ad3adf6d9d7bce8f2b62797cf083a9f95658cda7 CACHE STRING "Tensile tag to download" )
+    set( MIOPEN_TENSILE_TAG miot-pack CACHE STRING "Tensile tag to download" )
 endif()
 
 # option(BUILD_DEV "Build for development" OFF)
