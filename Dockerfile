@@ -86,7 +86,7 @@ ADD requirements.txt /requirements.txt
 RUN CXXFLAGS='-isystem $PREFIX/include' cget -p $PREFIX install -f /requirements.txt
 
 # Set sudo privileges
-RUN useradd --create-home -u ${user_uid} -o -G video --shell /bin/bash jenkins && \
+RUN useradd --create-home -G video --shell /bin/bash jenkins && \
     echo '%video   ALL=(ALL) NOPASSWD:ALL' | tee /etc/sudoers.d/sudo-nopasswd && \
     chmod 400 /etc/sudoers.d/sudo-nopasswd
 
