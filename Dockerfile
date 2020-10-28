@@ -88,5 +88,8 @@ RUN CXXFLAGS='-isystem $PREFIX/include' cget -p $PREFIX install -f /requirements
 # Set sudo privileges
 RUN useradd --create-home -G video --shell /bin/bash jenkins && \
     echo '%video   ALL=(ALL) NOPASSWD:ALL' | tee /etc/sudoers.d/sudo-nopasswd && \
-    chmod 400 /etc/sudoers.d/sudo-nopasswd
+    chmod 400 /etc/sudoers.d/sudo-nopasswd && \
+    usermod -aG video root && \
+    echo 'ADD_EXTRA_GROUPS=1' | sudo tee -a /etc/adduser.conf && \
+    echo 'EXTRA_GROUPS=video' | sudo tee -a /etc/adduser.conf
 
