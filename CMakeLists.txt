@@ -71,7 +71,7 @@ else()
     set(CODE_OBJECT_VERSION "V3")
     set(TENSILE_LIBRARY_FORMAT "msgpack")
     set(MIOPEN_TENSILE_SRC asm_full)
-    set( MIOPEN_TENSILE_TAG miot-pack CACHE STRING "Tensile tag to download" )
+    set( MIOPEN_TENSILE_TAG miot-staging CACHE STRING "Tensile tag to download" )
 endif()
 
 # option(BUILD_DEV "Build for development" OFF)
