@@ -7,7 +7,7 @@ project(miopentensile LANGUAGES CXX)
 
 add_definitions(-std=c++14)
 
-list(APPEND CMAKE_PREFIX_PATH ${CMAKE_INSTALL_PREFIX}/hcc ${CMAKE_INSTALL_PREFIX}/hip ${CMAKE_INSTALL_PREFIX}/llvm ${CMAKE_INSTALL_PREFIX})
+list(APPEND CMAKE_PREFIX_PATH ${CMAKE_INSTALL_PREFIX}/hcc ${CMAKE_INSTALL_PREFIX}/hip ${CMAKE_INSTALL_PREFIX}/llvm ${CMAKE_INSTALL_PREFIX} /opt/rocm/hcc /opt/rocm/hip /opt/rocm/llvm /opt/rocm)
 
 execute_process (
     COMMAND bash -c "awk -F= '/^ID=/{print $2}' /etc/os-release |tr -d '\n' | tr -d '\"'"
@@ -71,7 +71,7 @@ else()
     set(CODE_OBJECT_VERSION "V3")
     set(TENSILE_LIBRARY_FORMAT "msgpack")
     set(MIOPEN_TENSILE_SRC asm_full)
-    set( MIOPEN_TENSILE_TAG miot-pack CACHE STRING "Tensile tag to download" )
+    set( MIOPEN_TENSILE_TAG 8d492da2e713c9598825d63cc111f096ad9fc3cc CACHE STRING "Tensile tag to download" )
 endif()
 
 # option(BUILD_DEV "Build for development" OFF)

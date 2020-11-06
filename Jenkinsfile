@@ -24,14 +24,14 @@ def buildJob(config_targets="check"){
             rm -rf build
             export HIPCC_LINK_FLAGS_APPEND='-O3 -parallel-jobs=4'
             export HIPCC_COMPILE_FLAGS_APPEND='-O3 -Wno-format-nonliteral -parallel-jobs=4'
-            rbuild package -d deps --cxx /opt/rocm/hip/bin/hipcc
+            rbuild package -d deps --cxx /opt/rocm/hip/bin/hipcc -DCMAKE_INSTALL_PREFIX="/opt/rocm"
         """
     else
         cmd = """
             rm -rf build
             mkdir build
             cd build
-            CXX=/opt/rocm/hip/bin/hipcc cmake .. 
+            CXX=/opt/rocm/hip/bin/hipcc cmake -DCMAKE_INSTALL_PREFIX="/opt/rocm" .. 
             make -j check
         """
 
