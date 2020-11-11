@@ -21,7 +21,7 @@ def buildJob(config_targets="check"){
     def cmd = ""
     if(config_targets == "package")
         cmd = """
-            rm -rf build
+            rm -rf build deps
             export HIPCC_LINK_FLAGS_APPEND='-O3 -parallel-jobs=4'
             export HIPCC_COMPILE_FLAGS_APPEND='-O3 -Wno-format-nonliteral -parallel-jobs=4'
             rbuild package -d deps --cxx /opt/rocm/hip/bin/hipcc -DCMAKE_INSTALL_PREFIX="/opt/rocm"
