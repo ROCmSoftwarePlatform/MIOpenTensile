@@ -118,7 +118,7 @@ include(ROCMCreatePackage)
 rocm_create_package(
     NAME MIOpenTensile
     DESCRIPTION "MIOpen and Tensile integration library"
-    MAINTAINER "Paul Fultz II <paul.fultz@amd.com>"
+    MAINTAINER "MIOpenTensile Support <miopen-lib.support@amd.com>"
     LDCONFIG
     DEPENDS hip-hcc
 )
