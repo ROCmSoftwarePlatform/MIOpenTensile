@@ -71,7 +71,7 @@ else()
     set(CODE_OBJECT_VERSION "V3")
     set(TENSILE_LIBRARY_FORMAT "msgpack")
     set(MIOPEN_TENSILE_SRC asm_full)
-    set( MIOPEN_TENSILE_TAG 7f0426336397d6e44156397bd495d773e73fa7e6 CACHE STRING "Tensile tag to download" )
+    set( MIOPEN_TENSILE_TAG 47dd2c478c280042079cf9213d6633f10edc307e CACHE STRING "Tensile tag to download" )
 endif()
 
 # option(BUILD_DEV "Build for development" OFF)
@@ -112,7 +112,7 @@ include(ROCMCreatePackage)
 rocm_create_package(
     NAME MIOpenTensile
     DESCRIPTION "MIOpen and Tensile integration library"
-    MAINTAINER "Paul Fultz II <paul.fultz@amd.com>"
+    MAINTAINER "MIOpenTensile Support <miopen-lib.support@amd.com>"
     LDCONFIG
     DEPENDS hip-hcc
 )
