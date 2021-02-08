@@ -71,7 +71,7 @@ else()
     set(CODE_OBJECT_VERSION "V3")
     set(TENSILE_LIBRARY_FORMAT "msgpack")
     set(MIOPEN_TENSILE_SRC asm_full)
-    set( MIOPEN_TENSILE_TAG c7f2ddca8586e67be75d0aaeec371d07a2f96ae7 CACHE STRING "Tensile tag to download" )
+    set( MIOPEN_TENSILE_TAG 47dd2c478c280042079cf9213d6633f10edc307e CACHE STRING "Tensile tag to download" )
 endif()
 
 # option(BUILD_DEV "Build for development" OFF)
@@ -100,14 +100,8 @@ TensileCreateLibraryFiles(
     VAR_PREFIX MIOPENTENSILE
     )
 
-TensileCreateCopyTarget(
-    copy_kernels_miopentensile
-    "${MIOPENTENSILE_ALL_FILES}"
-    "${CMAKE_CURRENT_BINARY_DIR}/lib/miopentensile"
-    )
-
 add_library(MIOpenTensile SHARED src/gemm_api.cpp)
-add_dependencies(MIOpenTensile copy_kernels_miopentensile)
+add_dependencies(MIOpenTensile MIOPENTENSILE_LIBRARY_TARGET)
 target_link_libraries(MIOpenTensile PUBLIC hip::host)
 target_link_libraries(MIOpenTensile PRIVATE TensileHost)
 target_compile_definitions(MIOpenTensile PRIVATE __HIP_PLATFORM_HCC__)
