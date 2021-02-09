@@ -24,13 +24,15 @@ RUN apt-get update --fix-missing --allow-insecure-repositories && DEBIAN_FRONTEN
     g++ \
     gdb \
     git \
+    graphviz \
     hip-rocclr \
     lcov \
     libelf-dev \
     libncurses5-dev \
-    libnuma-dev \
     libpthread-stubs0-dev \
-    llvm-amdgpu \
+    libnuma1 \
+    llvm-6.0-dev \
+    libboost-all-dev \
     miopengemm \
     pkg-config \
     python \
@@ -52,7 +54,8 @@ RUN apt-get update --fix-missing --allow-insecure-repositories && DEBIAN_FRONTEN
     rocm-device-libs \
     rocm-opencl \
     rocm-opencl-dev \
-    zlib1g-dev && \
+    zlib1g-dev \
+    libomp-dev && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
  
@@ -69,7 +72,25 @@ RUN [ -d /opt/rocm ] || ln -sd $(realpath /opt/rocm-*) /opt/rocm
 # Install rocm-cmake
 RUN cget -p $PREFIX install RadeonOpenCompute/rocm-cmake@master
 
+# Manually download and install MessagePack DEB files
+RUN curl -O http://ftp.us.debian.org/debian/pool/main/m/msgpack-c/libmsgpack-dev_3.0.1-3_amd64.deb \
+         -O http://ftp.us.debian.org/debian/pool/main/m/msgpack-c/libmsgpackc2_3.0.1-3_amd64.deb
+RUN dpkg -i libmsgpack-dev_3.0.1-3_amd64.deb libmsgpackc2_3.0.1-3_amd64.deb
+
+RUN pip3 install setuptools --upgrade && \
+    pip3 install wheel && \
+    pip3 install tox pyyaml msgpack
+
 # Install dependencies
 RUN cget -p $PREFIX install pfultz2/rocm-recipes
 ADD requirements.txt /requirements.txt
 RUN CXXFLAGS='-isystem $PREFIX/include' cget -p $PREFIX install -f /requirements.txt
+
+# Set sudo privileges
+RUN useradd --create-home -G video --shell /bin/bash jenkins && \
+    echo '%video   ALL=(ALL) NOPASSWD:ALL' | tee /etc/sudoers.d/sudo-nopasswd && \
+    chmod 400 /etc/sudoers.d/sudo-nopasswd && \
+    usermod -aG video root && \
+    echo 'ADD_EXTRA_GROUPS=1' | sudo tee -a /etc/adduser.conf && \
+    echo 'EXTRA_GROUPS=video' | sudo tee -a /etc/adduser.conf
+
