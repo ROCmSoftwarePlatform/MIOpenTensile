@@ -118,6 +118,13 @@ miopen_tensile_matrix transpose(const miopen_tensile_matrix& a)
 
 Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& a, const miopen_tensile_matrix& b, const miopen_tensile_matrix& c)
 {
+    if (a.lens[0] != b.lens[1])
+      throw std::runtime_error("K dimensions do not match");
+    if (a.lens[1] != c.lens[1])
+      throw std::runtime_error("M dimensions do not match");
+    if (b.lens[0] != c.lens[0])
+      throw std::runtime_error("N dimensions do not match");
+
     if (a.batch.num > 1 or b.batch.num > 1 or c.batch.num > 1 or a.type != miopen_tensile_type_float or b.type != miopen_tensile_type_float or c.type != miopen_tensile_type_float)
     {
         auto batch = std::max({a.batch.num, b.batch.num, c.batch.num});
