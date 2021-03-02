@@ -282,7 +282,7 @@ TEST_CASE(gemm4)
     verify_gemm<float>(create_mat_shape({8, 4}),
                        create_mat_shape({32, 4}, true), 
                        create_mat_shape({8, 32}));
-// }
+}
 TEST_CASE(gemm5)
 {
     verify_gemm<float>(create_mat_shape({1024, 1024}),
