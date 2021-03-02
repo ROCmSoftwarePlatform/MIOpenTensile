@@ -270,12 +270,12 @@ TEST_CASE(gemm1)
                        create_mat_shape({2, 2}));
 }
 
-// TEST_CASE(gemm12)
-// {
-//     verify_gemm<float>(create_mat_shape({4, 1}, true),
-//                        create_mat_shape({4, 1}), 
-//                        create_mat_shape({1, 4}));
-// }
+TEST_CASE(gemm12)
+{
+    verify_gemm<float>(create_mat_shape({4, 1}, true),
+                       create_mat_shape({4, 1}), 
+                       create_mat_shape({1, 1}));
+}
 
 TEST_CASE(gemm2)
 {
