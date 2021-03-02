@@ -7,7 +7,7 @@
 #include <dlfcn.h>
 #include <glob.h>
 
-#define MIOT_DEBUG_PRINTOUTS 0
+#define MIOT_DEBUG_PRINTOUTS 1
 
 std::vector<std::string> glob_files(const std::string& s)
 {

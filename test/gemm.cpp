@@ -40,8 +40,7 @@ std::vector<T> generate(std::size_t sz, T start)
     std::vector<T> result(sz);
     std::generate(result.begin(), result.end(), [&] {
         T r = start;
-        start += 1;
-        start = std::min<T>(start, 6);
+        start = start > 6 ? 1 : start + 1;
         return r;
     });
     return result;
@@ -319,6 +318,12 @@ TEST_CASE(bgemm1)
     verify_gemm<float>(create_mat_shape({2, 2, 2}),
                        create_mat_shape({2, 2, 2}), 
                        create_mat_shape({2, 2, 2}));
+}
+TEST_CASE(bgemm21)
+{
+    verify_gemm<float>(create_mat_shape({3, 3, 2}),
+                       create_mat_shape({3, 2, 4}),
+                       create_mat_shape({3, 3, 4}));
 }
 TEST_CASE(bgemm2)
 {
