@@ -7,7 +7,7 @@
 #include <dlfcn.h>
 #include <glob.h>
 
-#define MIOT_DEBUG_PRINTOUTS 1
+#define MIOT_DEBUG_PRINTOUTS 0
 
 std::vector<std::string> glob_files(const std::string& s)
 {
@@ -86,8 +86,6 @@ auto& adaptor()
 
 bool is_transposed(const miopen_tensile_matrix& a)
 {
-    if (a.strides[1] == a.strides[0])
-      return a.lens[1] != 1;
     return a.strides[1] > a.strides[0];
 }
 
@@ -123,7 +121,7 @@ Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& 
     if (a.batch.num > 1 or b.batch.num > 1 or c.batch.num > 1 or a.type != miopen_tensile_type_float or b.type != miopen_tensile_type_float or c.type != miopen_tensile_type_float)
     {
         auto batch = std::max({a.batch.num, b.batch.num, c.batch.num});
-        auto k = is_transposed(a) ? a.lens[1] : a.lens[0];
+        auto k = a.lens[0];
         auto lda = get_ld(a);
         auto ldb = get_ld(b);
         auto stride_a = a.batch.stride;
@@ -149,6 +147,7 @@ Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& 
         printf("tensile gemm_strides\n");
         printf("is_transposed(a)  %d\n", int(is_transposed(a)));
         printf("is_transposed(b)  %d\n", int(is_transposed(b)));
+        printf("is_transposed(c)  %d\n", int(is_transposed(c)));
         printf("a.lens[0]  %zu\n", a.lens[0]);
         printf("a.lens[1]  %zu\n", a.lens[1]);
         printf("b.lens[0]  %zu\n", b.lens[0]);
@@ -163,6 +162,9 @@ Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& 
         printf("\n"); 
 	printf("c.lens[0]  %zu\n", c.lens[0]);
         printf("c.lens[1]  %zu\n", c.lens[1]);
+        printf("M  %zu\n", a.lens[1]);
+        printf("N  %zu\n", b.lens[0]);
+        printf("K  %zu\n", a.lens[0]);
         printf("\n");
 #endif
 
@@ -172,8 +174,8 @@ Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& 
                                                                  get_data_type(b), 
                                                                  get_data_type(c), 
                                                                  get_data_type(c), 
-                                                                 is_transposed(a) ? a.lens[0] : a.lens[1], 
-                                                                 is_transposed(b) ? b.lens[1] : b.lens[0], 
+                                                                 a.lens[1],
+                                                                 a.lens[0],
                                                                  k,
                                                                  batch,
                                                                  lda,
@@ -198,6 +200,7 @@ Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& 
         printf("tensile gemm\n");
         printf("is_transposed(a)  %d\n", int(is_transposed(a)));
         printf("is_transposed(b)  %d\n", int(is_transposed(b)));
+        printf("is_transposed(c)  %d\n", int(is_transposed(c)));
         printf("a.lens[0]  %zu\n", a.lens[0]);
         printf("a.lens[1]  %zu\n", a.lens[1]);
         printf("b.lens[0]  %zu\n", b.lens[0]);
@@ -211,14 +214,18 @@ Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& 
         printf("\n");
         printf("c.lens[0]  %zu\n", c.lens[0]);
         printf("c.lens[1]  %zu\n", c.lens[1]);
+        printf("M  %zu\n", a.lens[1]);
+        printf("N  %zu\n", b.lens[0]);
+        printf("K  %zu\n", a.lens[0]);
+
         printf("\n");
 #endif
 
         return Tensile::ContractionProblem::GEMM(is_transposed(a),
                                                  is_transposed(b), 
-                                                 is_transposed(a) ? a.lens[0] : a.lens[1], 
-                                                 is_transposed(b) ? b.lens[1] : b.lens[0], 
-                                                 is_transposed(a) ? a.lens[1] : a.lens[0], 
+                                                 a.lens[1],
+                                                 b.lens[0],
+                                                 a.lens[0],
                                                  get_ld(a), 
                                                  get_ld(b), 
                                                  get_ld(c), 
