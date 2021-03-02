@@ -7,7 +7,7 @@
 #include <dlfcn.h>
 #include <glob.h>
 
-#define MIOT_DEBUG_PRINTOUTS 0
+#define MIOT_DEBUG_PRINTOUTS 1
 
 std::vector<std::string> glob_files(const std::string& s)
 {
@@ -86,6 +86,8 @@ auto& adaptor()
 
 bool is_transposed(const miopen_tensile_matrix& a)
 {
+    if (a.strides[1] == a.strides[0])
+      return a.lens[1] != 1;
     return a.strides[1] > a.strides[0];
 }
 
