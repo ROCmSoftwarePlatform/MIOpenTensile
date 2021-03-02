@@ -7,7 +7,7 @@
 #include <dlfcn.h>
 #include <glob.h>
 
-#define MIOT_DEBUG_PRINTOUTS 1
+#define MIOT_DEBUG_PRINTOUTS 0
 
 std::vector<std::string> glob_files(const std::string& s)
 {
@@ -182,7 +182,7 @@ Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& 
                                                                  get_data_type(c), 
                                                                  get_data_type(c), 
                                                                  a.lens[1],
-                                                                 a.lens[0],
+                                                                 b.lens[0],
                                                                  k,
                                                                  batch,
                                                                  lda,
