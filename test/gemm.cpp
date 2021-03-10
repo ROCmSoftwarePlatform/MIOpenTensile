@@ -154,17 +154,15 @@ struct shape
 
     shape step(int axis, int step) const
     {
+        if (axis < 0)
+            return this->step(lens.size() + axis, step);
         shape r = *this;
         r.lens[axis] /= step;
-        if (r.strides[axis] == *std::max_element(r.strides.begin(), r.strides.end()))
-            return r;
-        std::set<std::size_t, std::greater<std::size_t>> sorted_strides(r.strides.begin(), r.strides.end());
-        sorted_strides.erase(sorted_strides.find(r.strides[axis]), sorted_strides.end());
-        assert(not sorted_strides.empty());
-        auto stride = *std::prev(sorted_strides.end());
-        auto it = std::find(r.strides.begin(), r.strides.end(), stride);
-        assert(it != r.strides.end());
-        *it /= step;
+        for(auto&& stride:r.strides)
+        {
+            if (stride > r.strides[axis])
+                stride /= step;
+        }
         return r;
     }
 
@@ -249,16 +247,17 @@ struct problem
     std::vector<Out> c;
 };
 
-template<class T>
-T accumulate(T x)
+template<class T, class U>
+double product(T x, U y)
 {
-    return x;
+    return double(x)*double(y);
 }
 
-template<class T, std::size_t N>
-T accumulate(const array<T, N>& x)
+template<class T, class U, std::size_t N>
+double product(const array<T, N>& x, const array<U, N>& y)
 {
-    return x.sum();
+    using R = array<double, N>;
+    return (R(x)*R(y)).sum();
 }
 
 template<class T, class Out = T>
@@ -269,7 +268,7 @@ std::vector<Out> cpu_gemm(problem<T, Out> p)
         double x = 0.0;
         dfor(k)([&](int kk) { 
             // x += a(i, kk) * b(kk, j); 
-            x += accumulate(p.a[p.as.index_ik(idx, kk)] * p.b[p.bs.index_kj(idx, kk)]); 
+            x += product(p.a[p.as.index_ik(idx, kk)], p.b[p.bs.index_kj(idx, kk)]); 
         });
         p.c[p.cs.index(idx)] = x;
     });
@@ -348,7 +347,9 @@ void verify_int8x4_gemm(shape as, shape bs, shape cs)
     std::cout << "a -> " << as << std::endl;
     std::cout << "b -> " << bs << std::endl;
     std::cout << "c -> " << cs << std::endl;
-    auto p = problem<int8x4, std::int32_t>::generate(as.step(1, 4), bs.step(0, 4), cs);
+    std::cout << "a' -> " << as.step(-1, 4) << std::endl;
+    std::cout << "b' -> " << bs.step(-2, 4) << std::endl;
+    auto p = problem<int8x4, std::int32_t>::generate(as.step(-1, 4), bs.step(-2, 4), cs);
     auto gpu_p = p;
     gpu_p.as = as;
     gpu_p.bs = bs;
