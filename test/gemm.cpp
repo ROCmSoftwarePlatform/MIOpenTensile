@@ -1,11 +1,19 @@
 #include <miopentensile/gemm.h>
 #include <algorithm>
 #include <numeric>
+#include <set>
 #include <sstream>
+#include <half.hpp>
 #include "hip.hpp"
+#include "array.hpp"
 #include "test.hpp"
 
 namespace mitensile {
+
+
+using int8x4 = array<std::int8_t, 4>;
+using doublex4 = array<double, 4>;
+using half = half_float::half;
 
 // Multidimensional for loop
 inline auto dfor()
@@ -24,31 +32,39 @@ auto dfor(T x, Ts... xs)
     };
 }
 
-template <class AF, class BF, class CF>
-void gemm(std::size_t n, std::size_t m, std::size_t k, AF a, BF b, CF c)
+template<class T>
+T increment(T start, int max)
 {
-    dfor(n, m)([&](int i, int j) {
-        double x = 0.0;
-        dfor(k)([&](int kk) { x += a(i, kk) * b(kk, j); });
-        c(i, j) = x;
-    });
+    return T(start > max ? 1 : start + 1);
 }
 
-template<class T>
-std::vector<T> generate(std::size_t sz, T start)
+int8x4 increment(int8x4 start, int max)
 {
+    int8x4 result = start;
+    for(std::size_t i = 0;i < 4;i++)
+    {
+        result[i] = start[i] > max ? 1 : start[i] + 1;
+    }
+    return result;
+}
+
+template<class T, class U>
+std::vector<T> generate(std::size_t sz, U pstart)
+{
+    auto start = T(pstart);
     std::vector<T> result(sz);
     std::generate(result.begin(), result.end(), [&] {
         T r = start;
-        start = start > 6 ? 1 : start + 1;
+        start = increment(start, 6);
         return r;
     });
     return result;
 }
 
-template<class T>
-std::vector<T> fill(std::size_t sz, T value)
+template<class T, class U>
+std::vector<T> fill(std::size_t sz, U pvalue)
 {
+    auto value = T(pvalue);
     std::vector<T> result(sz);
     std::fill(result.begin(), result.end(), value);
     return result;
@@ -136,6 +152,22 @@ struct shape
         return r;
     }
 
+    shape step(int axis, int step) const
+    {
+        shape r = *this;
+        r.lens[axis] /= step;
+        if (r.strides[axis] == *std::max_element(r.strides.begin(), r.strides.end()))
+            return r;
+        std::set<std::size_t, std::greater<std::size_t>> sorted_strides(r.strides.begin(), r.strides.end());
+        sorted_strides.erase(sorted_strides.find(r.strides[axis]), sorted_strides.end());
+        assert(not sorted_strides.empty());
+        auto stride = *std::prev(sorted_strides.end());
+        auto it = std::find(r.strides.begin(), r.strides.end(), stride);
+        assert(it != r.strides.end());
+        *it /= step;
+        return r;
+    }
+
     template<class T>
     std::vector<T> generate(std::size_t seed=0) const
     {
@@ -195,61 +227,133 @@ auto shape_with(const shape& s, R&& x)
     };
 }
 
-template<class T>
-std::vector<T> cpu_gemm(shape as, shape bs, shape cs)
+template<class T, class Out = T>
+struct problem
 {
-    auto a = as.generate<T>(1);
-    auto b = bs.generate<T>(2);
-    auto c = cs.fill<T>(0);
-    auto k = as.lens.back();
-    cs.for_each([&](auto idx) {
+    static problem generate(shape as, shape bs, shape cs)
+    {
+        problem result;
+        result.as = as;
+        result.bs = bs;
+        result.cs = cs;
+        result.a = as.generate<T>(1);
+        result.b = bs.generate<T>(2);
+        result.c = cs.fill<Out>(0);
+        return result;
+    }
+    shape as;
+    shape bs;
+    shape cs;
+    std::vector<T> a;
+    std::vector<T> b;
+    std::vector<Out> c;
+};
+
+template<class T>
+T accumulate(T x)
+{
+    return x;
+}
+
+template<class T, std::size_t N>
+T accumulate(const array<T, N>& x)
+{
+    return x.sum();
+}
+
+template<class T, class Out = T>
+std::vector<Out> cpu_gemm(problem<T, Out> p)
+{
+    auto k = p.as.lens.back();
+    p.cs.for_each([&](auto idx) {
         double x = 0.0;
         dfor(k)([&](int kk) { 
             // x += a(i, kk) * b(kk, j); 
-            x += a[as.index_ik(idx, kk)] * b[bs.index_kj(idx, kk)]; 
+            x += accumulate(p.a[p.as.index_ik(idx, kk)] * p.b[p.bs.index_kj(idx, kk)]); 
         });
-        c[cs.index(idx)] = x;
+        p.c[p.cs.index(idx)] = x;
     });
-    return c;
+    return p.c;
 }
 
-template<class Ptr>
+template<miopen_tensile_type N>
+using tensile_type_const = std::integral_constant<miopen_tensile_type, N>;
+
+template<class T>
+struct get_data_type {};
+
+template<>
+struct get_data_type<float> : tensile_type_const<miopen_tensile_type_float>
+{};
+
+template<>
+struct get_data_type<half> : tensile_type_const<miopen_tensile_type_half>
+{};
+
+template<>
+struct get_data_type<int8x4> : tensile_type_const<miopen_tensile_type_int8x4>
+{};
+
+template<>
+struct get_data_type<std::int32_t> : tensile_type_const<miopen_tensile_type_int32>
+{};
+
+template<class T, class Ptr>
 miopen_tensile_matrix to_tensile_matrix(shape s, const Ptr& p)
 {
     if (s.lens.size() == 2)
-        return miopen_tensile_matrix{{s.lens[0], s.lens[1]}, {s.strides[0], s.strides[1]}, {0, 0}, miopen_tensile_type_float, p.get()};
+        return miopen_tensile_matrix{{s.lens[0], s.lens[1]}, {s.strides[0], s.strides[1]}, {0, 0}, get_data_type<T>{}, p.get()};
     else if (s.lens.size() == 3)
-        return miopen_tensile_matrix{{s.lens[1], s.lens[2]}, {s.strides[1], s.strides[2]}, {s.lens[0], s.strides[0]}, miopen_tensile_type_float, p.get()};
+        return miopen_tensile_matrix{{s.lens[1], s.lens[2]}, {s.strides[1], s.strides[2]}, {s.lens[0], s.strides[0]}, get_data_type<T>{}, p.get()};
     else
         throw std::runtime_error("Invalid shape to to_tensile_matrix");
 }
 
-template<class T>
-std::vector<T> gpu_gemm(shape as, shape bs, shape cs)
+template<class T, class Out = T>
+std::vector<Out> gpu_gemm(const problem<T, Out>& p)
 {
-    auto a = to_gpu(as.generate<T>(1));
-    auto b = to_gpu(bs.generate<T>(2));
-    auto c = to_gpu(cs.fill<T>(0));
-    auto am = to_tensile_matrix(as, a);
-    auto bm = to_tensile_matrix(bs, b);
-    auto cm = to_tensile_matrix(cs, c);
+    auto a = to_gpu(p.a);
+    auto b = to_gpu(p.b);
+    auto c = to_gpu(p.c);
+    auto am = to_tensile_matrix<T>(p.as, a);
+    auto bm = to_tensile_matrix<T>(p.bs, b);
+    auto cm = to_tensile_matrix<Out>(p.cs, c);
 
     auto stream = create_stream();
     auto e = miopen_tensile_gemm_hip(stream.get(), &am, &bm, &cm, 1.0, 0.0);
     if (e != miopen_tensile_status_success)
         throw std::runtime_error("Failed to run miopen_tensile_gemm_hip");
-    auto r = from_gpu<T>(cm.data, cs.element_space());
+    auto r = from_gpu<Out>(cm.data, p.cs.element_space());
     return r;
 }
 
-template<class T>
+template<class T, class Out = T>
 void verify_gemm(shape as, shape bs, shape cs)
 {
     std::cout << "a -> " << as << std::endl;
     std::cout << "b -> " << bs << std::endl;
     std::cout << "c -> " << cs << std::endl;
-    auto cpu = cpu_gemm<T>(as, bs, cs);
-    auto gpu = gpu_gemm<T>(as, bs, cs);
+    auto p = problem<T, Out>::generate(as, bs, cs);
+    auto cpu = cpu_gemm(p);
+    auto gpu = gpu_gemm(p);
+    EXPECT(cpu == gpu);
+}
+void verify_gemm(shape as, shape bs, shape cs)
+{
+    verify_gemm<float>(as, bs, cs);
+    verify_gemm<half>(as, bs, cs);
+}
+void verify_int8x4_gemm(shape as, shape bs, shape cs)
+{
+    std::cout << "a -> " << as << std::endl;
+    std::cout << "b -> " << bs << std::endl;
+    std::cout << "c -> " << cs << std::endl;
+    auto p = problem<int8x4, std::int32_t>::generate(as.step(1, 4), bs.step(0, 4), cs);
+    auto gpu_p = p;
+    gpu_p.as = as;
+    gpu_p.bs = bs;
+    auto cpu = cpu_gemm(p);
+    auto gpu = gpu_gemm(gpu_p);
     EXPECT(cpu == gpu);
 }
 
@@ -264,80 +368,101 @@ shape create_mat_shape(std::vector<std::size_t> l, bool transposed = false)
 
 TEST_CASE(gemm1)
 {
-    verify_gemm<float>(create_mat_shape({2, 2}, true),
+    verify_gemm(create_mat_shape({2, 2}, true),
                        create_mat_shape({2, 2}), 
                        create_mat_shape({2, 2}));
 }
 
 TEST_CASE(gemm12)
 {
-    verify_gemm<float>(create_mat_shape({4, 1}, true),
+    verify_gemm(create_mat_shape({4, 1}, true),
                        create_mat_shape({4, 1}), 
                        create_mat_shape({1, 1}));
 }
 
 TEST_CASE(gemm2)
 {
-    verify_gemm<float>(create_mat_shape({8, 4}),
+    verify_gemm(create_mat_shape({8, 4}),
                        create_mat_shape({4, 32}), 
                        create_mat_shape({8, 32}));
 }
 TEST_CASE(gemm31)
 {
-    verify_gemm<float>(create_mat_shape({8, 4}),
+    verify_gemm(create_mat_shape({8, 4}),
                        create_mat_shape({4, 32}), 
                        create_mat_shape({8, 32}));
 }
 TEST_CASE(gemm3)
 {
-    verify_gemm<float>(create_mat_shape({4, 8}, true),
+    verify_gemm(create_mat_shape({4, 8}, true),
                        create_mat_shape({4, 32}), 
                        create_mat_shape({8, 32}));
 }
 TEST_CASE(gemm4)
 {
-    verify_gemm<float>(create_mat_shape({8, 4}),
+    verify_gemm(create_mat_shape({8, 4}),
                        create_mat_shape({32, 4}, true), 
                        create_mat_shape({8, 32}));
-}
-TEST_CASE(gemm5)
-{
-    verify_gemm<float>(create_mat_shape({1024, 1024}),
-                       create_mat_shape({1024, 1024}), 
-                       create_mat_shape({1024, 1024}));
-}
-TEST_CASE(gemm6)
-{
-    verify_gemm<float>(create_mat_shape({1024, 2048},true),
-                       create_mat_shape({2048, 1024},true),
-                       create_mat_shape({2048, 2048}));
 }
 
 TEST_CASE(bgemm1)
 {
-    verify_gemm<float>(create_mat_shape({2, 2, 2}),
+    verify_gemm(create_mat_shape({2, 2, 2}),
                        create_mat_shape({2, 2, 2}), 
                        create_mat_shape({2, 2, 2}));
 }
 TEST_CASE(bgemm21)
 {
-    verify_gemm<float>(create_mat_shape({3, 3, 2}),
+    verify_gemm(create_mat_shape({3, 3, 2}),
                        create_mat_shape({3, 2, 4}),
                        create_mat_shape({3, 3, 4}));
 }
 TEST_CASE(bgemm2)
 {
-    verify_gemm<float>(create_mat_shape({64, 8, 4}),
+    verify_gemm(create_mat_shape({64, 8, 4}),
                        create_mat_shape({64, 4, 32}),
                        create_mat_shape({64, 8, 32}));
 }
 TEST_CASE(bgemm3)
 {
-    verify_gemm<float>(create_mat_shape({64, 4, 8}, true),
+    verify_gemm(create_mat_shape({64, 4, 8}, true),
                        create_mat_shape({64, 32, 4}, true),
                        create_mat_shape({64, 8, 32}));
 }
 
+TEST_CASE(int8gemm1)
+{
+    verify_int8x4_gemm(create_mat_shape({2, 4}),
+                       create_mat_shape({4, 2}), 
+                       create_mat_shape({2, 2}));
+}
+
+TEST_CASE(int8gemm2)
+{
+    verify_int8x4_gemm(create_mat_shape({3, 4}),
+                       create_mat_shape({4, 5}), 
+                       create_mat_shape({3, 5}));
+}
+
+TEST_CASE(int8bgemm1)
+{
+    verify_int8x4_gemm(create_mat_shape({32, 2, 4}),
+                       create_mat_shape({32, 4, 2}), 
+                       create_mat_shape({32, 2, 2}));
+}
+
+TEST_CASE(large_gemm1)
+{
+    verify_gemm<float>(create_mat_shape({1024, 1024}),
+                       create_mat_shape({1024, 1024}), 
+                       create_mat_shape({1024, 1024}));
+}
+TEST_CASE(large_gemm2)
+{
+    verify_gemm<float>(create_mat_shape({1024, 2048},true),
+                       create_mat_shape({2048, 1024},true),
+                       create_mat_shape({2048, 2048}));
+}
 
 } // namespace mitensile
 

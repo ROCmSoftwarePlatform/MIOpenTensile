@@ -127,7 +127,7 @@ Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& 
 
     if (a.batch.num > 1 or b.batch.num > 1 or c.batch.num > 1 or a.type != miopen_tensile_type_float or b.type != miopen_tensile_type_float or c.type != miopen_tensile_type_float)
     {
-        auto batch = std::max({a.batch.num, b.batch.num, c.batch.num});
+        auto batch = std::max({a.batch.num, b.batch.num, c.batch.num, std::size_t{1}});
         auto k = a.lens[0];
         auto lda = get_ld(a);
         auto ldb = get_ld(b);
@@ -161,8 +161,10 @@ Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& 
         printf("b.lens[1]  %zu\n", b.lens[1]);
         printf("batch  %zu\n", batch);
         printf("get_ld(a)  %zu\n", get_ld(a));
+        printf("lda  %zu\n", lda);
         printf("a.batch.stride  %zu\n", a.batch.stride);
         printf("get_ld(b)  %zu\n", get_ld(b));
+        printf("ldb  %zu\n", ldb);
         printf("b.batch.stride  %zu\n", b.batch.stride);
         printf("get_ld(c)  %zu\n", get_ld(c));
         printf("c.batch.stride  %zu\n", c.batch.stride);
