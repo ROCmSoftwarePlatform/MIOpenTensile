@@ -5,6 +5,7 @@
 #include <stdbool.h>
 
 #include <hip/hip_runtime_api.h>
+#include <CL/cl.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -44,6 +45,13 @@ typedef struct
 } miopen_tensile_matrix;
 
 miopen_tensile_status miopen_tensile_gemm_hip(hipStream_t stream, 
+                                              miopen_tensile_matrix* a, 
+                                              miopen_tensile_matrix* b, 
+                                              miopen_tensile_matrix* c, 
+                                              double alpha, 
+                                              double beta);
+
+miopen_tensile_status miopen_tensile_gemm_ocl(cl_command_queue& stream, 
                                               miopen_tensile_matrix* a, 
                                               miopen_tensile_matrix* b, 
                                               miopen_tensile_matrix* c, 
