@@ -445,11 +445,25 @@ TEST_CASE(int8gemm2)
                        create_mat_shape({3, 5}));
 }
 
+TEST_CASE(int8gemm3)
+{
+    verify_int8x4_gemm(create_mat_shape({4, 3}, true),
+                       create_mat_shape({4, 5}), 
+                       create_mat_shape({3, 5}));
+}
+
 TEST_CASE(int8bgemm1)
 {
-    verify_int8x4_gemm(create_mat_shape({32, 2, 4}),
-                       create_mat_shape({32, 4, 2}), 
-                       create_mat_shape({32, 2, 2}));
+    verify_int8x4_gemm(create_mat_shape({16, 2, 4}),
+                       create_mat_shape({16, 4, 2}), 
+                       create_mat_shape({16, 2, 2}));
+}
+
+TEST_CASE(int8bgemm2)
+{
+    verify_int8x4_gemm(create_mat_shape({16, 2, 4}),
+                       create_mat_shape({16, 2, 4}, true), 
+                       create_mat_shape({16, 2, 2}));
 }
 
 TEST_CASE(large_gemm1)
