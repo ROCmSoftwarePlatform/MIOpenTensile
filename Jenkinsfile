@@ -13,7 +13,7 @@ def rocmnode(name) {
     } else {
         node_name = name
     }
-    return node_name
+    return node_name + '&& !nogpu';
 }
 
 def buildJob(config_targets="check"){
