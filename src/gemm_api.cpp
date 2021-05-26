@@ -96,7 +96,7 @@ auto& adaptor()
 
 bool is_transposed(const miopen_tensile_matrix& a)
 {
-    return a.is_mat_transposed;
+    return a.strides[1] > a.strides[0];
 }
 
 size_t get_idx(const miopen_tensile_matrix& a, size_t n)
@@ -123,15 +123,22 @@ Tensile::DataType get_data_type(const miopen_tensile_matrix& a)
 
 miopen_tensile_matrix transpose(const miopen_tensile_matrix& a)
 {
-    return miopen_tensile_matrix{{a.lens[1], a.lens[0]}, {a.strides[1], a.strides[0]}, a.batch, a.type, !a.is_mat_transposed, a.data};
+    return miopen_tensile_matrix{{a.lens[1], a.lens[0]}, {a.strides[1], a.strides[0]}};
 }
 
 Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& a, const miopen_tensile_matrix& b, const miopen_tensile_matrix& c)
 {
+    if (a.lens[0] != b.lens[1])
+      throw std::runtime_error("K dimensions do not match");
+    if (a.lens[1] != c.lens[1])
+      throw std::runtime_error("M dimensions do not match");
+    if (b.lens[0] != c.lens[0])
+      throw std::runtime_error("N dimensions do not match");
+
     if (a.batch.num > 1 or b.batch.num > 1 or c.batch.num > 1 or a.type != miopen_tensile_type_float or b.type != miopen_tensile_type_float or c.type != miopen_tensile_type_float)
     {
-        auto batch = std::max({a.batch.num, b.batch.num, c.batch.num});
-        auto k = is_transposed(a) ? a.lens[1] : a.lens[0];
+        auto batch = std::max({a.batch.num, b.batch.num, c.batch.num, std::size_t{1}});
+        auto k = a.lens[0];
         auto lda = get_ld(a);
         auto ldb = get_ld(b);
         auto stride_a = a.batch.stride;
@@ -157,20 +164,26 @@ Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& 
         printf("tensile gemm_strides\n");
         printf("is_transposed(a)  %d\n", int(is_transposed(a)));
         printf("is_transposed(b)  %d\n", int(is_transposed(b)));
+        printf("is_transposed(c)  %d\n", int(is_transposed(c)));
         printf("a.lens[0]  %zu\n", a.lens[0]);
         printf("a.lens[1]  %zu\n", a.lens[1]);
         printf("b.lens[0]  %zu\n", b.lens[0]);
         printf("b.lens[1]  %zu\n", b.lens[1]);
         printf("batch  %zu\n", batch);
         printf("get_ld(a)  %zu\n", get_ld(a));
+        printf("lda  %zu\n", lda);
         printf("a.batch.stride  %zu\n", a.batch.stride);
         printf("get_ld(b)  %zu\n", get_ld(b));
+        printf("ldb  %zu\n", ldb);
         printf("b.batch.stride  %zu\n", b.batch.stride);
         printf("get_ld(c)  %zu\n", get_ld(c));
         printf("c.batch.stride  %zu\n", c.batch.stride);
         printf("\n"); 
 	printf("c.lens[0]  %zu\n", c.lens[0]);
         printf("c.lens[1]  %zu\n", c.lens[1]);
+        printf("M  %zu\n", a.lens[1]);
+        printf("N  %zu\n", b.lens[0]);
+        printf("K  %zu\n", a.lens[0]);
         printf("\n");
 #endif
 
@@ -180,8 +193,8 @@ Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& 
                                                                  get_data_type(b), 
                                                                  get_data_type(c), 
                                                                  get_data_type(c), 
-                                                                 is_transposed(a) ? a.lens[0] : a.lens[1], 
-                                                                 is_transposed(b) ? b.lens[1] : b.lens[0], 
+                                                                 a.lens[1],
+                                                                 b.lens[0],
                                                                  k,
                                                                  batch,
                                                                  lda,
@@ -206,6 +219,7 @@ Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& 
         printf("tensile gemm\n");
         printf("is_transposed(a)  %d\n", int(is_transposed(a)));
         printf("is_transposed(b)  %d\n", int(is_transposed(b)));
+        printf("is_transposed(c)  %d\n", int(is_transposed(c)));
         printf("a.lens[0]  %zu\n", a.lens[0]);
         printf("a.lens[1]  %zu\n", a.lens[1]);
         printf("b.lens[0]  %zu\n", b.lens[0]);
@@ -219,14 +233,18 @@ Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& 
         printf("\n");
         printf("c.lens[0]  %zu\n", c.lens[0]);
         printf("c.lens[1]  %zu\n", c.lens[1]);
+        printf("M  %zu\n", a.lens[1]);
+        printf("N  %zu\n", b.lens[0]);
+        printf("K  %zu\n", a.lens[0]);
+
         printf("\n");
 #endif
 
         return Tensile::ContractionProblem::GEMM(is_transposed(a),
                                                  is_transposed(b), 
-                                                 is_transposed(a) ? a.lens[0] : a.lens[1], 
-                                                 is_transposed(b) ? b.lens[1] : b.lens[0], 
-                                                 is_transposed(a) ? a.lens[1] : a.lens[0], 
+                                                 a.lens[1],
+                                                 b.lens[0],
+                                                 a.lens[0],
                                                  get_ld(a), 
                                                  get_ld(b), 
                                                  get_ld(c), 

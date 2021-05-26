@@ -74,10 +74,10 @@ else()
     set( MIOPEN_TENSILE_TAG 7ccaf4aac555d54a95dbbb89fd50c696b02a6bb3 CACHE STRING "Tensile tag to download" )
 endif()
 
-# option(BUILD_DEV "Build for development" OFF)
-# if(BUILD_DEV)
-#     set(MIOPEN_TENSILE_SRC dev)
-# endif()
+option(BUILD_DEV "Build for development" OFF)
+if(BUILD_DEV)
+    set(MIOPEN_TENSILE_SRC dev)
+endif()
 # Use the virtual-env setup and download package from specified repo:
 virtualenv_install(wheel)
 virtualenv_install("git+https://github.com/ROCmSoftwarePlatform/Tensile.git@${MIOPEN_TENSILE_TAG}")
@@ -101,7 +101,16 @@ TensileCreateLibraryFiles(
     )
 
 add_library(MIOpenTensile SHARED src/gemm_api.cpp)
-add_dependencies(MIOpenTensile MIOPENTENSILE_LIBRARY_TARGET)
+if(TARGET MIOPENTENSILE_LIBRARY_TARGET)
+    add_dependencies(MIOpenTensile MIOPENTENSILE_LIBRARY_TARGET)
+else()
+    TensileCreateCopyTarget(
+        copy_kernels_miopentensile
+        "${MIOPENTENSILE_ALL_FILES}"
+        "${CMAKE_CURRENT_BINARY_DIR}/lib/miopentensile"
+        )
+    add_dependencies(MIOpenTensile copy_kernels_miopentensile)
+endif()
 target_link_libraries(MIOpenTensile PUBLIC hip::host)
 target_link_libraries(MIOpenTensile PRIVATE TensileHost)
 target_compile_definitions(MIOpenTensile PRIVATE __HIP_PLATFORM_HCC__)
