@@ -83,6 +83,7 @@ RUN pip3 install setuptools --upgrade && \
 
 # Install dependencies
 RUN cget -p $PREFIX install pfultz2/rocm-recipes
+RUN cget -p $PREFIX install kitware/cmake@v3.15.1
 ADD requirements.txt /requirements.txt
 RUN CXXFLAGS='-isystem $PREFIX/include' cget -p $PREFIX install -f /requirements.txt
 
