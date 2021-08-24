@@ -8,8 +8,8 @@ ARG MIOTENSILE_VER="default"
 RUN dpkg --add-architecture i386
 
 # Add rocm repository
-# RUN sh -c 'echo deb [arch=amd64 trusted=yes] http://repo.radeon.com/rocm/apt/.apt_3.7/ xenial main > /etc/apt/sources.list.d/rocm.list'
-RUN sh -c 'echo deb [arch=amd64 trusted=yes] http://compute-artifactory.amd.com/artifactory/list/rocm-osdb-deb/ compute-rocm-dkms-amd-feature-targetid 3004 > /etc/apt/sources.list.d/rocm.list'
+RUN sh -c 'echo deb [arch=amd64 trusted=yes] http://repo.radeon.com/rocm/apt/.apt_4.3/ xenial main > /etc/apt/sources.list.d/rocm.list'
+# RUN sh -c 'echo deb [arch=amd64 trusted=yes] http://compute-artifactory.amd.com/artifactory/list/rocm-osdb-deb/ compute-rocm-dkms-amd-feature-targetid 3004 > /etc/apt/sources.list.d/rocm.list'
 
 # Install dependencies
 RUN apt-get update --fix-missing --allow-insecure-repositories && DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-unauthenticated \
@@ -83,6 +83,7 @@ RUN pip3 install setuptools --upgrade && \
 
 # Install dependencies
 RUN cget -p $PREFIX install pfultz2/rocm-recipes
+RUN cget -p $PREFIX install kitware/cmake@v3.15.1
 ADD requirements.txt /requirements.txt
 RUN CXXFLAGS='-isystem $PREFIX/include' cget -p $PREFIX install -f /requirements.txt
 
