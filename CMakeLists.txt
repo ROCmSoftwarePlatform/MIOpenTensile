@@ -7,7 +7,7 @@ project(miopentensile LANGUAGES CXX)
 
 add_definitions(-std=c++14)
 
-list(APPEND CMAKE_PREFIX_PATH ${CMAKE_INSTALL_PREFIX}/hcc ${CMAKE_INSTALL_PREFIX}/hip ${CMAKE_INSTALL_PREFIX}/llvm ${CMAKE_INSTALL_PREFIX} /opt/rocm/hcc /opt/rocm/hip /opt/rocm/llvm /opt/rocm)
+list(APPEND CMAKE_PREFIX_PATH ${CMAKE_INSTALL_PREFIX}/hcc ${CMAKE_INSTALL_PREFIX}/hip ${CMAKE_INSTALL_PREFIX}/llvm ${CMAKE_INSTALL_PREFIX}/opencl ${CMAKE_INSTALL_PREFIX} /opt/rocm/hcc /opt/rocm/hip /opt/rocm/llvm /opt/rocm/opencl /opt/rocm)
 
 execute_process (
     COMMAND bash -c "awk -F= '/^ID=/{print $2}' /etc/os-release |tr -d '\n' | tr -d '\"'"
@@ -74,10 +74,10 @@ else()
     set( MIOPEN_TENSILE_TAG 17aabd14cb7ede34307c40fc87a5074832acf16b CACHE STRING "Tensile tag to download" )
 endif()
 
-# option(BUILD_DEV "Build for development" OFF)
-# if(BUILD_DEV)
-#     set(MIOPEN_TENSILE_SRC dev)
-# endif()
+option(BUILD_DEV "Build for development" OFF)
+if(BUILD_DEV)
+    set(MIOPEN_TENSILE_SRC dev)
+endif()
 # Use the virtual-env setup and download package from specified repo:
 virtualenv_install(wheel)
 virtualenv_install("git+https://github.com/ROCmSoftwarePlatform/Tensile.git@${MIOPEN_TENSILE_TAG}")
@@ -101,7 +101,16 @@ TensileCreateLibraryFiles(
     )
 
 add_library(MIOpenTensile SHARED src/gemm_api.cpp)
-add_dependencies(MIOpenTensile MIOPENTENSILE_LIBRARY_TARGET)
+if(TARGET MIOPENTENSILE_LIBRARY_TARGET)
+    add_dependencies(MIOpenTensile MIOPENTENSILE_LIBRARY_TARGET)
+else()
+    TensileCreateCopyTarget(
+        copy_kernels_miopentensile
+        "${MIOPENTENSILE_ALL_FILES}"
+        "${CMAKE_CURRENT_BINARY_DIR}/lib/miopentensile"
+        )
+    add_dependencies(MIOpenTensile copy_kernels_miopentensile)
+endif()
 target_link_libraries(MIOpenTensile PUBLIC hip::host)
 target_link_libraries(MIOpenTensile PRIVATE TensileHost)
 target_compile_definitions(MIOpenTensile PRIVATE __HIP_PLATFORM_HCC__)

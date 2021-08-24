@@ -69,24 +69,34 @@ const auto& library()
     return *result;
 }
 
+template <typename Backend>
 auto create_adaptor() {
     // Workaround: The Tensile::hip::SolutionAdapter is not a regular type, so heap allocate it instead
+    if(std::is_same<Backend, cl::CommandQueue>::value)
+    {
+        auto a = std::make_shared<Tensile::ocl::SolutionAdapter>();
+        for(auto&& f:glob_files(library_path() + "*co"))
+            a->loadCodeObjectFile(f);
+        return a;
+    }
+
     auto a = std::make_shared<Tensile::hip::SolutionAdapter>();
     for(auto&& f:glob_files(library_path() + "*co"))
         a->loadCodeObjectFile(f);
     return a;
 }
 
+template <typename Backend>
 auto& adaptor()
 {
-    static auto result = create_adaptor();
+    static auto result = create_adaptor<Backend>();
     return *result;
 }
 
 
 bool is_transposed(const miopen_tensile_matrix& a)
 {
-    return a.is_mat_transposed;
+    return a.strides[1] > a.strides[0];
 }
 
 size_t get_idx(const miopen_tensile_matrix& a, size_t n)
@@ -113,15 +123,22 @@ Tensile::DataType get_data_type(const miopen_tensile_matrix& a)
 
 miopen_tensile_matrix transpose(const miopen_tensile_matrix& a)
 {
-    return miopen_tensile_matrix{{a.lens[1], a.lens[0]}, {a.strides[1], a.strides[0]}, a.batch, a.type, !a.is_mat_transposed, a.data};
+    return miopen_tensile_matrix{{a.lens[1], a.lens[0]}, {a.strides[1], a.strides[0]}};
 }
 
 Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& a, const miopen_tensile_matrix& b, const miopen_tensile_matrix& c)
 {
+    if (a.lens[0] != b.lens[1])
+      throw std::runtime_error("K dimensions do not match");
+    if (a.lens[1] != c.lens[1])
+      throw std::runtime_error("M dimensions do not match");
+    if (b.lens[0] != c.lens[0])
+      throw std::runtime_error("N dimensions do not match");
+
     if (a.batch.num > 1 or b.batch.num > 1 or c.batch.num > 1 or a.type != miopen_tensile_type_float or b.type != miopen_tensile_type_float or c.type != miopen_tensile_type_float)
     {
-        auto batch = std::max({a.batch.num, b.batch.num, c.batch.num});
-        auto k = is_transposed(a) ? a.lens[1] : a.lens[0];
+        auto batch = std::max({a.batch.num, b.batch.num, c.batch.num, std::size_t{1}});
+        auto k = a.lens[0];
         auto lda = get_ld(a);
         auto ldb = get_ld(b);
         auto stride_a = a.batch.stride;
@@ -147,20 +164,26 @@ Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& 
         printf("tensile gemm_strides\n");
         printf("is_transposed(a)  %d\n", int(is_transposed(a)));
         printf("is_transposed(b)  %d\n", int(is_transposed(b)));
+        printf("is_transposed(c)  %d\n", int(is_transposed(c)));
         printf("a.lens[0]  %zu\n", a.lens[0]);
         printf("a.lens[1]  %zu\n", a.lens[1]);
         printf("b.lens[0]  %zu\n", b.lens[0]);
         printf("b.lens[1]  %zu\n", b.lens[1]);
         printf("batch  %zu\n", batch);
         printf("get_ld(a)  %zu\n", get_ld(a));
+        printf("lda  %zu\n", lda);
         printf("a.batch.stride  %zu\n", a.batch.stride);
         printf("get_ld(b)  %zu\n", get_ld(b));
+        printf("ldb  %zu\n", ldb);
         printf("b.batch.stride  %zu\n", b.batch.stride);
         printf("get_ld(c)  %zu\n", get_ld(c));
         printf("c.batch.stride  %zu\n", c.batch.stride);
         printf("\n"); 
 	printf("c.lens[0]  %zu\n", c.lens[0]);
         printf("c.lens[1]  %zu\n", c.lens[1]);
+        printf("M  %zu\n", a.lens[1]);
+        printf("N  %zu\n", b.lens[0]);
+        printf("K  %zu\n", a.lens[0]);
         printf("\n");
 #endif
 
@@ -170,8 +193,8 @@ Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& 
                                                                  get_data_type(b), 
                                                                  get_data_type(c), 
                                                                  get_data_type(c), 
-                                                                 is_transposed(a) ? a.lens[0] : a.lens[1], 
-                                                                 is_transposed(b) ? b.lens[1] : b.lens[0], 
+                                                                 a.lens[1],
+                                                                 b.lens[0],
                                                                  k,
                                                                  batch,
                                                                  lda,
@@ -196,6 +219,7 @@ Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& 
         printf("tensile gemm\n");
         printf("is_transposed(a)  %d\n", int(is_transposed(a)));
         printf("is_transposed(b)  %d\n", int(is_transposed(b)));
+        printf("is_transposed(c)  %d\n", int(is_transposed(c)));
         printf("a.lens[0]  %zu\n", a.lens[0]);
         printf("a.lens[1]  %zu\n", a.lens[1]);
         printf("b.lens[0]  %zu\n", b.lens[0]);
@@ -209,14 +233,18 @@ Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& 
         printf("\n");
         printf("c.lens[0]  %zu\n", c.lens[0]);
         printf("c.lens[1]  %zu\n", c.lens[1]);
+        printf("M  %zu\n", a.lens[1]);
+        printf("N  %zu\n", b.lens[0]);
+        printf("K  %zu\n", a.lens[0]);
+
         printf("\n");
 #endif
 
         return Tensile::ContractionProblem::GEMM(is_transposed(a),
                                                  is_transposed(b), 
-                                                 is_transposed(a) ? a.lens[0] : a.lens[1], 
-                                                 is_transposed(b) ? b.lens[1] : b.lens[0], 
-                                                 is_transposed(a) ? a.lens[1] : a.lens[0], 
+                                                 a.lens[1],
+                                                 b.lens[0],
+                                                 a.lens[0],
                                                  get_ld(a), 
                                                  get_ld(b), 
                                                  get_ld(c), 
@@ -226,8 +254,8 @@ Tensile::ContractionProblem create_tensile_problem(const miopen_tensile_matrix& 
     }
 }
 
-template <typename A, typename B = A, typename C = A, typename D = C, typename Alpha = C, typename Beta = C>
-miopen_tensile_status launch_kernels(hipStream_t& stream, 
+template <typename Backend, typename A, typename B = A, typename C = A, typename D = C, typename Alpha = C, typename Beta = C>
+miopen_tensile_status launch_kernels(Backend& stream, 
                                      Tensile::ContractionProblem& problem, 
                                      std::shared_ptr<Tensile::Hardware>& hardware, 
                                      std::shared_ptr<Tensile::ContractionProblem::Solution>& solution, 
@@ -245,7 +273,14 @@ miopen_tensile_status launch_kernels(hipStream_t& stream,
     inputs.alpha = Alpha(alpha);
     inputs.beta = Beta(beta);
     auto kernels = solution->solve(problem, inputs, *hardware);
-    adaptor().launchKernels(kernels, stream, nullptr, nullptr);
+    if(std::is_same<Backend, hipStream_t>::value)
+    {
+        adaptor<Backend>().launchKernels(kernels, stream, nullptr, nullptr);
+    }
+    else
+    {
+        adaptor<Backend>().launchKernels(kernels, stream, nullptr);
+    }
     return miopen_tensile_status_success;
 }
 
@@ -269,15 +304,45 @@ miopen_tensile_status miopen_tensile_gemm_hip(hipStream_t stream,
     switch(a->type)
     {
     case miopen_tensile_type_float:
-        return launch_kernels<float>(stream, problem, hardware, solution, a, b, c, alpha, beta);
+        return launch_kernels<hipStream_t, float>(stream, problem, hardware, solution, a, b, c, alpha, beta);
     case miopen_tensile_type_half:
-        return launch_kernels<Tensile::Half>(stream, problem, hardware, solution, a, b, c, alpha, beta);
+        return launch_kernels<hipStream_t, Tensile::Half>(stream, problem, hardware, solution, a, b, c, alpha, beta);
     case miopen_tensile_type_int8x4:
-        return launch_kernels<Tensile::Int8x4, Tensile::Int8x4, int32_t>(stream, problem, hardware, solution, a, b, c, alpha, beta);
+        return launch_kernels<hipStream_t, Tensile::Int8x4, Tensile::Int8x4, int32_t>(stream, problem, hardware, solution, a, b, c, alpha, beta);
     case miopen_tensile_type_int32:
         return miopen_tensile_status_no_solution;
     case miopen_tensile_type_bfloat16:
-        return launch_kernels<Tensile::BFloat16, Tensile::BFloat16, Tensile::BFloat16, Tensile::BFloat16, float, float>(stream, problem, hardware, solution, a, b, c, alpha, beta);
+        return launch_kernels<hipStream_t, Tensile::BFloat16, Tensile::BFloat16, Tensile::BFloat16, Tensile::BFloat16, float, float>(stream, problem, hardware, solution, a, b, c, alpha, beta);
+    }
+}
+
+miopen_tensile_status miopen_tensile_gemm_ocl(cl_command_queue& stream, 
+                                              miopen_tensile_matrix* a, 
+                                              miopen_tensile_matrix* b, 
+                                              miopen_tensile_matrix* c, 
+                                              double alpha, 
+                                              double beta)
+{
+    auto problem = create_tensile_problem(deref(b), deref(a), deref(c));
+    auto hardware = Tensile::ocl::GetCurrentDevice();
+    auto solution = library().findBestSolution(problem, *hardware);
+    if (not solution)
+    {
+        std::cerr << "No solution found." << std::endl;
+        return miopen_tensile_status_no_solution;
+    }
+    switch(a->type)
+    {
+    case miopen_tensile_type_float:
+        return launch_kernels<cl::CommandQueue, float>(stream, problem, hardware, solution, a, b, c, alpha, beta);
+    case miopen_tensile_type_half:
+        return launch_kernels<cl::CommandQueue, Tensile::Half>(stream, problem, hardware, solution, a, b, c, alpha, beta);
+    case miopen_tensile_type_int8x4:
+        return launch_kernels<cl::CommandQueue, Tensile::Int8x4, Tensile::Int8x4, int32_t>(stream, problem, hardware, solution, a, b, c, alpha, beta);
+    case miopen_tensile_type_int32:
+        return miopen_tensile_status_no_solution;
+    case miopen_tensile_type_bfloat16:
+        return launch_kernels<cl::CommandQueue, Tensile::BFloat16, Tensile::BFloat16, Tensile::BFloat16, Tensile::BFloat16, float, float>(stream, problem, hardware, solution, a, b, c, alpha, beta);
     }
 }
 
