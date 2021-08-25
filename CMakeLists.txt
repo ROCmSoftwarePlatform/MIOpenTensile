@@ -102,7 +102,7 @@ TensileCreateLibraryFiles(
 
 add_library(MIOpenTensile SHARED src/gemm_api.cpp)
 add_dependencies(MIOpenTensile MIOPENTENSILE_LIBRARY_TARGET)
-target_link_libraries(MIOpenTensile PUBLIC hip::host)
+target_link_libraries(MIOpenTensile PUBLIC hip::host -ldl)
 target_link_libraries(MIOpenTensile PRIVATE TensileHost)
 target_compile_definitions(MIOpenTensile PRIVATE __HIP_PLATFORM_HCC__)
 
