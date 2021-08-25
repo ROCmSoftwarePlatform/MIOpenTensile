@@ -111,7 +111,7 @@ else()
         )
     add_dependencies(MIOpenTensile copy_kernels_miopentensile)
 endif()
-target_link_libraries(MIOpenTensile PUBLIC hip::host)
+target_link_libraries(MIOpenTensile PUBLIC hip::host -ldl)
 target_link_libraries(MIOpenTensile PRIVATE TensileHost)
 target_compile_definitions(MIOpenTensile PRIVATE __HIP_PLATFORM_HCC__)
 
