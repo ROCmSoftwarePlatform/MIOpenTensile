@@ -1,6 +1,7 @@
 
 cmake_minimum_required(VERSION 3.5)
 
+set(BUILD_SHARED_LIBS OFF)
 set(CMAKE_INSTALL_PREFIX "/opt/rocm" CACHE PATH "")
 
 project(miopentensile LANGUAGES CXX)
