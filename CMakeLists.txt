@@ -123,7 +123,7 @@ rocm_create_package(
     DESCRIPTION "MIOpen and Tensile integration library"
     MAINTAINER "MIOpenTensile Support <miopen-lib.support@amd.com>"
     LDCONFIG
-    DEPENDS hip-hcc
+    DEPENDS hip-devel hip-runtime-amd
 )
 
 rocm_install_targets(
