@@ -10,4 +10,4 @@ To build MIOpenTensile,
 1. git clone https://github.com/ROCmSoftwarePlatform/MIOpenTensile -b master
 2. cd MIOpenTensile
 3. mkdir build; cd build
-4. CXX=${ROCM_PATH}/hip/bin/hipcc cmake ..
+4. CXX=${ROCM_PATH}/bin/hipcc cmake ..
