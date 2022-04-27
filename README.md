@@ -1,3 +1,5 @@
+# This repo has been archived
+
 MIOpenTensile provides host-callable interfaces to Tensile library.
 
 MIOpenTensile supports one programming model: HIP.
